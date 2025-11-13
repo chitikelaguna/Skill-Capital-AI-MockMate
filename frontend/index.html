@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Capital AI MockMate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <img src="logo.png" alt="Skill Capital AI MockMate Logo" class="header-logo">
+                <div class="header-text">
+                    <h1>Skill Capital AI MockMate</h1>
+                    <p class="subtitle">Practice and improve your interview skills</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Profile Section -->
+            <section class="section" id="profileSection">
+                <h2>Your Profile</h2>
+                <div class="card" id="profileCard">
+                    <div id="profileContent">Loading profile...</div>
+                </div>
+            </section>
+
+            <!-- Resume Upload Section -->
+            <section class="section" id="uploadSection">
+                <h2>Upload Resume</h2>
+                <div class="card">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content" id="uploadContent">
+                            <p class="upload-text">Drop your resume here or choose a file</p>
+                            <p class="upload-hint">PDF & DOCX only. Max 2MB file size.</p>
+                            <input type="file" id="fileInput" accept=".pdf,.docx,.doc" hidden>
+                            <button class="btn btn-primary" id="uploadBtn">Upload Resume</button>
+                            <p class="privacy-text">🔒 Privacy guaranteed</p>
+                        </div>
+                        <div class="upload-scanning hidden" id="uploadScanning">
+                            <div class="spinner"></div>
+                            <p class="scanning-text">Scanning your file...</p>
+                            <p class="upload-text">Drop your resume here or choose a file</p>
+                            <p class="upload-hint">PDF & DOCX only. Max 2MB file size.</p>
+                            <p class="privacy-text">🔒 Privacy guaranteed</p>
+                        </div>
+                    </div>
+                    <div id="uploadResult" class="upload-result hidden"></div>
+                </div>
+            </section>
+
+            <!-- Interview Chat Section -->
+            <section class="section hidden" id="chatSection">
+                <div class="card">
+                    <div class="chat-header">
+                        <h2>Mock Interview</h2>
+                        <div class="progress-info">
+                            <span id="progressText">Question 1 of 10</span>
+                            <span id="timerDisplay" class="timer hidden">60s</span>
+                            <button class="btn btn-small" id="endBtn">End</button>
+                        </div>
+                    </div>
+                    <div class="chat-container" id="chatContainer"></div>
+                    <div class="chat-input-area">
+                        <textarea id="answerInput" class="input-textarea" placeholder="Type your answer..." rows="3"></textarea>
+                        <button class="btn btn-primary" id="submitBtn">Submit</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard Section -->
+            <section class="section" id="dashboardSection">
+                <h2>Performance Dashboard</h2>
+                <div class="card">
+                    <!-- Key Metrics Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <h3>Total Interviews</h3>
+                            <p class="stat-value" id="totalInterviews">0</p>
+                            <div class="stat-trend" id="interviewsTrend"></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⭐</div>
+                            <h3>Average Score</h3>
+                            <p class="stat-value" id="avgScore">0</p>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" id="avgScoreBar">
+                                    <div class="progress-fill" id="avgScoreFill"></div>
+                                </div>
+                                <span class="progress-text" id="avgScoreText">0%</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <h3>Completion Rate</h3>
+                            <p class="stat-value" id="completionRate">0%</p>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" id="completionBar">
+                                    <div class="progress-fill" id="completionFill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Skills Analysis -->
+                    <div class="skills-analysis">
+                        <div class="skills-box">
+                            <div class="skills-header">
+                                <h3>✨ Strong Skills</h3>
+                                <span class="skills-count" id="strongSkillsCount">0</span>
+                            </div>
+                            <div id="strongSkills" class="skills-list"></div>
+                        </div>
+                        <div class="skills-box">
+                            <div class="skills-header">
+                                <h3>📈 Areas to Improve</h3>
+                                <span class="skills-count" id="weakSkillsCount">0</span>
+                            </div>
+                            <div id="weakSkills" class="skills-list"></div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Interviews -->
+                    <div class="recent-interviews-section">
+                        <h3>Recent Interview History</h3>
+                        <div id="pastInterviews" class="interviews-list"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Skill Capital AI MockMate</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

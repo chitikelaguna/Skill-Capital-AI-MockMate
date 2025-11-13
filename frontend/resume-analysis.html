@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Analysis - Skill Capital AI MockMate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .analysis-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+        .success-banner {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 1px solid #c3e6cb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .success-banner h2 {
+            color: #155724;
+            margin-bottom: 8px;
+            font-size: 22px;
+        }
+        .success-banner p {
+            color: #155724;
+            font-size: 14px;
+        }
+        .analysis-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px var(--shadow-sm);
+        }
+        .analysis-section {
+            margin-bottom: 25px;
+        }
+        .analysis-section:last-child {
+            margin-bottom: 0;
+        }
+        .analysis-section h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-light);
+        }
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 150px;
+        }
+        .info-value {
+            color: var(--text-primary);
+            flex: 1;
+        }
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .spinner-large {
+            width: 60px;
+            height: 60px;
+            border: 5px solid var(--border-light);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        .error-state {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border: 1px solid #f5c6cb;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            color: #721c24;
+        }
+        .error-state h3 {
+            color: #721c24;
+            margin-bottom: 10px;
+        }
+        .back-button {
+            margin-top: 30px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <img src="logo.png" alt="Skill Capital AI MockMate Logo" class="header-logo">
+                <div class="header-text">
+                    <h1>Resume Analysis</h1>
+                    <p class="subtitle">Your resume has been processed</p>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="analysis-container">
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-state">
+                    <div class="spinner-large"></div>
+                    <h2 style="color: var(--text-secondary); margin-bottom: 10px;">Analyzing Your Resume...</h2>
+                    <p style="color: var(--text-light);">Please wait while we extract information from your resume.</p>
+                </div>
+
+                <!-- Success State -->
+                <div id="successState" class="hidden">
+                    <div class="success-banner">
+                        <h2>✓ Your resume has been successfully analyzed!</h2>
+                        <p>We've extracted the following information from your resume.</p>
+                    </div>
+
+                    <div class="analysis-card">
+                        <div class="analysis-section">
+                            <h3>📋 Personal Information</h3>
+                            <div class="info-row">
+                                <span class="info-label">Name:</span>
+                                <span class="info-value" id="resumeName">Not found</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Email:</span>
+                                <span class="info-value" id="resumeEmail">Not found</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Experience Level:</span>
+                                <span class="info-value" id="resumeExperience">Not found</span>
+                            </div>
+                            <div id="experienceInputContainer" class="hidden" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                                <p style="color: #856404; margin-bottom: 10px; font-size: 14px;">
+                                    <strong>Experience not found in resume.</strong> Please enter your experience manually.
+                                </p>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <input 
+                                        type="text" 
+                                        id="experienceInput" 
+                                        placeholder="e.g., 2 years, Fresher, 5+ years"
+                                        style="flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px;"
+                                    >
+                                    <button 
+                                        id="saveExperienceBtn" 
+                                        class="btn btn-primary"
+                                        style="padding: 10px 20px; font-size: 14px;"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-section">
+                            <h3>💼 Skills Extracted</h3>
+                            <div id="resumeSkills" class="skills-list"></div>
+                        </div>
+
+                        <div class="analysis-section">
+                            <h3>📊 Summary</h3>
+                            <div class="info-row">
+                                <span class="info-label">Total Skills:</span>
+                                <span class="info-value" id="skillsCount">0</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Text Extracted:</span>
+                                <span class="info-value" id="textLength">0 characters</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div id="errorState" class="hidden">
+                    <div class="error-state">
+                        <h3>⚠️ Resume Analysis Failed</h3>
+                        <p id="errorMessage">An error occurred while processing your resume. Please try again.</p>
+                        <p style="margin-top: 15px; font-size: 14px; color: #666;">
+                            <strong>Tips:</strong><br>
+                            • Ensure your file is a valid PDF or DOCX document<br>
+                            • For LaTeX-generated PDFs (from Overleaf): Install Tesseract OCR or export as PDF/A<br>
+                            • Make sure the file contains selectable text (not just images)<br>
+                            • Check that the file is not corrupted or password-protected<br>
+                            • Try uploading a different file format or re-exporting your resume
+                        </p>
+                    </div>
+                </div>
+
+                <div class="back-button">
+                    <button class="btn btn-primary" onclick="window.location.href='/'">Back to Dashboard</button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2024 Skill Capital AI MockMate</p>
+        </footer>
+    </div>
+
+    <script>
+        // Get resume data from URL parameters or sessionStorage
+        async function loadResumeAnalysis() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session') || sessionStorage.getItem('resume_analysis_session');
+            
+            // Try to get from sessionStorage first (faster)
+            const cachedData = sessionStorage.getItem('resume_analysis_data');
+            if (cachedData) {
+                try {
+                    const data = JSON.parse(cachedData);
+                    // Check if it's an error state
+                    if (data.success === false && data.error) {
+                        showError(data.error || 'Failed to parse resume. Please try again with another file.');
+                        return;
+                    }
+                    // Display success data
+                    displayAnalysis(data);
+                    return;
+                } catch (e) {
+                    console.warn('Failed to parse cached data, fetching from server');
+                }
+            }
+            
+            if (!sessionId || sessionId === 'new') {
+                showError('No resume analysis data found. Please upload a resume first.');
+                return;
+            }
+
+            try {
+                // Fetch analysis data from backend
+                const API_BASE = 'http://127.0.0.1:8000';
+                const res = await fetch(`${API_BASE}/api/profile/resume-analysis/${sessionId}`);
+                
+                if (!res.ok) {
+                    // Fallback to sessionStorage if backend fails
+                    if (cachedData) {
+                        const data = JSON.parse(cachedData);
+                        displayAnalysis(data);
+                        return;
+                    }
+                    throw new Error('Failed to fetch analysis data');
+                }
+
+                const data = await res.json();
+                
+                // Check for error state
+                if (data.success === false && data.error) {
+                    showError(data.error || 'Failed to parse resume. Please try again with another file.');
+                    return;
+                }
+                
+                displayAnalysis(data);
+            } catch (e) {
+                console.error('Error loading analysis:', e);
+                // Try sessionStorage as fallback
+                if (cachedData) {
+                    try {
+                        const data = JSON.parse(cachedData);
+                        displayAnalysis(data);
+                        return;
+                    } catch (parseError) {
+                        console.error('Failed to parse cached data:', parseError);
+                    }
+                }
+                showError('Failed to load resume analysis. Please try uploading again.');
+            }
+        }
+
+        function displayAnalysis(data) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('successState').classList.remove('hidden');
+
+            // Display personal information
+            document.getElementById('resumeName').textContent = data.name || 'Not found';
+            document.getElementById('resumeEmail').textContent = data.email || 'Not found';
+            
+            // Handle experience display and manual input
+            const experience = data.experience_level || data.experience || 'Not found';
+            const experienceElement = document.getElementById('resumeExperience');
+            const experienceInputContainer = document.getElementById('experienceInputContainer');
+            
+            // Check if experience is missing or not specified
+            const isExperienceMissing = !experience || 
+                                       experience === 'Not found' || 
+                                       experience === 'Not specified' || 
+                                       experience === 'Unknown' ||
+                                       experience.trim() === '';
+            
+            if (isExperienceMissing) {
+                experienceElement.textContent = 'Not found';
+                experienceInputContainer.classList.remove('hidden');
+            } else {
+                experienceElement.textContent = experience;
+                experienceInputContainer.classList.add('hidden');
+            }
+
+            // Display skills
+            const skills = data.skills || [];
+            const skillsContainer = document.getElementById('resumeSkills');
+            if (skills.length > 0) {
+                skillsContainer.innerHTML = skills.map(s => `<span class="skill-tag">${s}</span>`).join('');
+            } else {
+                skillsContainer.innerHTML = '<p style="color: #999; font-size: 13px; padding: 10px;">No skills detected</p>';
+            }
+
+            // Display summary
+            document.getElementById('skillsCount').textContent = skills.length;
+            document.getElementById('textLength').textContent = (data.text_length || 0) + ' characters';
+        }
+
+        // Handle manual experience input
+        async function saveExperience() {
+            const experienceInput = document.getElementById('experienceInput');
+            const experience = experienceInput.value.trim();
+            
+            if (!experience) {
+                alert('Please enter your experience level.');
+                return;
+            }
+            
+            // Get session ID from URL or sessionStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session') || sessionStorage.getItem('resume_analysis_session');
+            
+            if (!sessionId) {
+                alert('Session not found. Please refresh the page and try again.');
+                return;
+            }
+            
+            try {
+                const API_BASE = 'http://127.0.0.1:8000';
+                
+                // Get user_id from sessionStorage or window (fallback)
+                const userId = sessionStorage.getItem('resume_user_id') || window.TEST_USER_ID || null;
+                
+                // Build URL with experience and optional user_id
+                let url = `${API_BASE}/api/profile/resume-analysis/${sessionId}/experience?experience=${encodeURIComponent(experience)}`;
+                if (userId) {
+                    url += `&user_id=${encodeURIComponent(userId)}`;
+                }
+                
+                console.log('[EXPERIENCE_UPDATE] Sending request to:', url);
+                console.log('[EXPERIENCE_UPDATE] Session ID:', sessionId);
+                console.log('[EXPERIENCE_UPDATE] User ID:', userId);
+                
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('[EXPERIENCE_UPDATE] Response status:', response.status);
+                
+                if (!response.ok) {
+                    // Try to get error message from response
+                    let errorMessage = 'Failed to update experience';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } catch (e) {
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    console.error('[EXPERIENCE_UPDATE] Error response:', errorMessage);
+                    throw new Error(errorMessage);
+                }
+                
+                const result = await response.json();
+                console.log('[EXPERIENCE_UPDATE] Success response:', result);
+                
+                // Verify success
+                if (result.status === 'success' || result.success === true) {
+                    // Update the display immediately
+                    document.getElementById('resumeExperience').textContent = experience;
+                    document.getElementById('experienceInputContainer').classList.add('hidden');
+                    
+                    // Update cached data in sessionStorage
+                    const cachedData = sessionStorage.getItem('resume_analysis_data');
+                    if (cachedData) {
+                        const data = JSON.parse(cachedData);
+                        data.experience_level = experience;
+                        sessionStorage.setItem('resume_analysis_data', JSON.stringify(data));
+                    }
+                    
+                    // Show success message briefly
+                    const saveBtn = document.getElementById('saveExperienceBtn');
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = 'Saved!';
+                    saveBtn.style.background = '#28a745';
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                        saveBtn.style.background = '';
+                    }, 2000);
+                } else {
+                    throw new Error(result.message || 'Unknown error occurred');
+                }
+                
+            } catch (error) {
+                console.error('[EXPERIENCE_UPDATE] Error saving experience:', error);
+                console.error('[EXPERIENCE_UPDATE] Error details:', error.message);
+                alert(`Failed to save experience: ${error.message || 'Please try again.'}`);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        // Load analysis on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadResumeAnalysis();
+            
+            // Setup experience input handlers (already handled above, but ensure they're set)
+            const saveBtn = document.getElementById('saveExperienceBtn');
+            const experienceInput = document.getElementById('experienceInput');
+            
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveExperience);
+            }
+            
+            if (experienceInput) {
+                experienceInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        saveExperience();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+
