@@ -4,7 +4,7 @@ Pydantic models for interview requests and responses
 """
 
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 
@@ -186,3 +186,18 @@ class InterviewEvaluationResponse(BaseModel):
     areas_for_improvement: List[str]
     generated_at: datetime
 
+
+class TechnicalInterviewStartRequest(BaseModel):
+    """
+    Schema for starting a technical interview
+    """
+    user_id: str
+
+
+class TechnicalInterviewStartResponse(BaseModel):
+    """
+    Schema for technical interview start response
+    """
+    session_id: str
+    conversation_history: List[Dict[str, str]]
+    technical_skills: List[str]

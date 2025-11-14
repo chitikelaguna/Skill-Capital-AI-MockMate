@@ -586,10 +586,17 @@
         }
 
         function startInterviewFromModule(moduleType) {
-            // Redirect to main page where interviews can be started
             // Store the module type in sessionStorage for reference
             sessionStorage.setItem('selectedInterviewModule', moduleType);
-            window.location.href = '/';
+            
+            // Redirect to appropriate interview page
+            if (moduleType === 'technical') {
+                // Redirect to technical interview page
+                window.location.href = 'technical-interview.html';
+            } else {
+                // For other modules, redirect to main page
+                window.location.href = '/';
+            }
         }
 
         // Handle manual experience input

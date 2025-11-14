@@ -2,7 +2,8 @@
 Interview routes
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, Body
+from fastapi.responses import StreamingResponse
 from supabase import Client
 from app.db.client import get_supabase_client
 from app.schemas.interview import (
@@ -16,13 +17,16 @@ from app.schemas.interview import (
     SubmitAnswerRequest,
     SubmitAnswerResponse,
     InterviewEvaluationRequest,
-    InterviewEvaluationResponse
+    InterviewEvaluationResponse,
+    TechnicalInterviewStartRequest,
+    TechnicalInterviewStartResponse
 )
 from app.services.topic_generator import topic_generator
 from app.services.question_generator import question_generator
 from app.services.answer_evaluator import answer_evaluator
 from app.services.interview_evaluator import interview_evaluator
 from app.services.resume_parser import resume_parser
+from app.services.technical_interview_engine import technical_interview_engine
 from app.utils.database import (
     get_user_profile,
     get_interview_session,
@@ -32,11 +36,15 @@ from app.utils.database import (
 )
 from app.utils.datetime_utils import parse_datetime, get_current_timestamp
 from app.utils.exceptions import NotFoundError, ValidationError, DatabaseError
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
 import tempfile
 import os
+import json
+import io
+import base64
+import urllib.parse
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
@@ -545,4 +553,480 @@ async def evaluate_interview(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error evaluating interview: {str(e)}")
+
+# ==================== Technical Interview Endpoints ====================
+
+@router.post("/technical", response_model=TechnicalInterviewStartResponse)
+async def start_technical_interview(
+    request: TechnicalInterviewStartRequest,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Start a new technical interview session based on user's resume
+    """
+    try:
+        user_id = request.user_id
+        
+        # Get user profile to extract resume skills
+        profile_response = supabase.table("user_profiles").select("*").eq("user_id", user_id).execute()
+        
+        resume_skills = []
+        resume_context = None
+        
+        if profile_response.data and len(profile_response.data) > 0:
+            profile = profile_response.data[0]
+            resume_skills = profile.get("skills", [])
+            resume_url = profile.get("resume_url")
+            
+            # Try to parse resume if available
+            if resume_url:
+                try:
+                    if "storage/v1/object/public/" in resume_url:
+                        path_part = resume_url.split("storage/v1/object/public/")[1]
+                        bucket_name = path_part.split("/")[0]
+                        file_path = "/".join(path_part.split("/")[1:])
+                        
+                        file_response = supabase.storage.from_(bucket_name).download(file_path)
+                        
+                        if file_response:
+                            file_extension = os.path.splitext(file_path)[1]
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+                                tmp_file.write(file_response)
+                                tmp_file_path = tmp_file.name
+                            
+                            try:
+                                parsed_resume = resume_parser.parse_resume(tmp_file_path, file_extension)
+                                resume_context = {
+                                    "keywords": parsed_resume.get("keywords", {}),
+                                    "skills": parsed_resume.get("skills", [])
+                                }
+                            finally:
+                                if os.path.exists(tmp_file_path):
+                                    os.unlink(tmp_file_path)
+                except Exception as e:
+                    print(f"Warning: Could not parse resume for technical interview: {str(e)}")
+        
+        # Initialize interview session using engine
+        session_data = technical_interview_engine.start_interview_session(
+            user_id=user_id,
+            resume_skills=resume_skills,
+            resume_context=resume_context
+        )
+        
+        # Create session in database
+        db_session_data = {
+            "user_id": user_id,
+            "role": "Technical Interview",
+            "experience_level": profile_response.data[0].get("experience_level", "Intermediate") if profile_response.data else "Intermediate",
+            "skills": session_data["technical_skills"],
+            "session_status": "active"
+        }
+        
+        session_response = supabase.table("interview_sessions").insert(db_session_data).execute()
+        
+        if not session_response.data or len(session_response.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to create interview session")
+        
+        session_id = session_response.data[0]["id"]
+        session_data["session_id"] = session_id
+        
+        # Store session metadata (conversation history) in a JSON field
+        # We'll use a metadata field or store in session notes
+        # For now, we'll store conversation history in session metadata
+        metadata = {
+            "conversation_history": session_data["conversation_history"],
+            "current_question_index": 0,
+            "questions_asked": [],
+            "answers_received": [],
+            "all_scores": []
+        }
+        
+        # Update session with metadata (store as JSON in a text field or use a metadata column)
+        # Since we don't have a metadata column, we'll manage this in memory and store in answers/questions
+        
+        return TechnicalInterviewStartResponse(
+            session_id=session_id,
+            conversation_history=session_data["conversation_history"],
+            technical_skills=session_data["technical_skills"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting technical interview: {str(e)}")
+
+@router.post("/technical/{session_id}/next-question")
+async def get_next_technical_question(
+    session_id: str,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Get the next technical question for the interview
+    """
+    try:
+        # Get session
+        session_response = supabase.table("interview_sessions").select("*").eq("id", session_id).execute()
+        
+        if not session_response.data or len(session_response.data) == 0:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = session_response.data[0]
+        
+        # Get conversation history from stored questions and answers
+        questions_response = supabase.table("interview_questions").select("*").eq("session_id", session_id).order("question_number").execute()
+        answers_response = supabase.table("interview_answers").select("*").eq("session_id", session_id).order("question_number").execute()
+        
+        # Build conversation history
+        conversation_history = []
+        questions_asked = []
+        answers_received = []
+        
+        # Add questions and answers to conversation
+        questions = questions_response.data if questions_response.data else []
+        answers = answers_response.data if answers_response.data else []
+        
+        for q in questions:
+            conversation_history.append({"role": "ai", "content": q["question"]})
+            questions_asked.append(q["question"])
+        
+        for a in answers:
+            conversation_history.append({"role": "user", "content": a["user_answer"]})
+            answers_received.append(a["user_answer"])
+        
+        # Prepare session data
+        session_data = {
+            "session_id": session_id,
+            "technical_skills": session.get("skills", []),
+            "conversation_history": conversation_history,
+            "current_question_index": len(questions),
+            "questions_asked": questions_asked,
+            "answers_received": answers_received
+        }
+        
+        # Check if interview should end (max 10 questions)
+        if len(questions_asked) >= 10:
+            return {
+                "interview_completed": True,
+                "message": "Interview completed. Maximum questions reached."
+            }
+        
+        # Generate next question
+        question_data = technical_interview_engine.generate_next_question(session_data, conversation_history)
+        
+        # Store question in database
+        question_number = len(questions) + 1
+        question_db_data = {
+            "session_id": session_id,
+            "question_type": question_data.get("question_type", "Technical"),
+            "question": question_data["question"],
+            "question_number": question_number
+        }
+        
+        supabase.table("interview_questions").insert(question_db_data).execute()
+        
+        # Generate audio URL using TTS
+        audio_url = None
+        try:
+            # We'll generate audio on-demand via the TTS endpoint
+            import urllib.parse
+            encoded_text = urllib.parse.quote(question_data['question'])
+            audio_url = f"/api/interview/text-to-speech?text={encoded_text}"
+        except Exception as e:
+            print(f"Warning: Could not generate audio URL: {str(e)}")
+        
+        return {
+            "question": question_data["question"],
+            "question_type": question_data.get("question_type", "Technical"),
+            "audio_url": audio_url,
+            "interview_completed": False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting next question: {str(e)}")
+
+@router.post("/technical/{session_id}/submit-answer")
+async def submit_technical_answer(
+    session_id: str,
+    request: Dict[str, Any],
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Submit an answer to the current technical question
+    """
+    try:
+        question = request.get("question")
+        answer = request.get("answer")
+        
+        if not question or not answer:
+            raise HTTPException(status_code=400, detail="question and answer are required")
+        
+        # Get session
+        session_response = supabase.table("interview_sessions").select("*").eq("id", session_id).execute()
+        
+        if not session_response.data or len(session_response.data) == 0:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = session_response.data[0]
+        
+        # Get current question from database
+        questions_response = supabase.table("interview_questions").select("*").eq("session_id", session_id).order("question_number", desc=True).limit(1).execute()
+        
+        if not questions_response.data or len(questions_response.data) == 0:
+            raise HTTPException(status_code=404, detail="No current question found")
+        
+        current_question_db = questions_response.data[0]
+        question_id = current_question_db["id"]
+        question_number = current_question_db["question_number"]
+        
+        # Get conversation history
+        questions_list = supabase.table("interview_questions").select("*").eq("session_id", session_id).order("question_number").execute()
+        answers_list = supabase.table("interview_answers").select("*").eq("session_id", session_id).order("question_number").execute()
+        
+        conversation_history = []
+        for q in (questions_list.data or []):
+            conversation_history.append({"role": "ai", "content": q["question"]})
+        for a in (answers_list.data or []):
+            conversation_history.append({"role": "user", "content": a["user_answer"]})
+        
+        # Prepare session data
+        session_data = {
+            "session_id": session_id,
+            "technical_skills": session.get("skills", []),
+            "conversation_history": conversation_history,
+            "current_question_index": len(questions_list.data or []),
+            "questions_asked": [q["question"] for q in (questions_list.data or [])],
+            "answers_received": [a["user_answer"] for a in (answers_list.data or [])]
+        }
+        
+        # Evaluate answer
+        evaluation = technical_interview_engine.evaluate_answer(
+            question=question,
+            answer=answer,
+            session_data=session_data,
+            conversation_history=conversation_history
+        )
+        
+        # Store answer in database
+        answer_data = {
+            "session_id": session_id,
+            "question_id": question_id,
+            "question_number": question_number,
+            "question_text": question,
+            "question_type": current_question_db.get("question_type", "Technical"),
+            "user_answer": answer,
+            "relevance_score": evaluation["scores"]["relevance"],
+            "confidence_score": 0,  # Not used in technical interview
+            "technical_accuracy_score": evaluation["scores"]["technical_accuracy"],
+            "communication_score": evaluation["scores"]["communication"],
+            "overall_score": evaluation["scores"]["overall"],
+            "ai_feedback": evaluation.get("ai_response", ""),
+            "response_time": None,
+            "evaluated_at": datetime.now().isoformat()
+        }
+        
+        answer_response = supabase.table("interview_answers").insert(answer_data).execute()
+        
+        # Generate audio URL for AI response
+        audio_url = None
+        if evaluation.get("ai_response"):
+            try:
+                import urllib.parse
+                encoded_text = urllib.parse.quote(evaluation['ai_response'])
+                audio_url = f"/api/interview/text-to-speech?text={encoded_text}"
+            except Exception as e:
+                print(f"Warning: Could not generate audio URL: {str(e)}")
+        
+        # Check if interview should continue (max 10 questions)
+        total_questions = len(questions_list.data or [])
+        if total_questions >= 10:
+            return {
+                "ai_response": evaluation.get("ai_response", "Thank you for your answer."),
+                "audio_url": audio_url,
+                "scores": evaluation["scores"],
+                "interview_completed": True
+            }
+        
+        return {
+            "ai_response": evaluation.get("ai_response", "Thank you for your answer."),
+            "audio_url": audio_url,
+            "scores": evaluation["scores"],
+            "interview_completed": False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error submitting answer: {str(e)}")
+
+@router.get("/technical/{session_id}/feedback")
+async def get_technical_interview_feedback(
+    session_id: str,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Get final feedback for completed technical interview
+    """
+    try:
+        # Get session
+        session_response = supabase.table("interview_sessions").select("*").eq("id", session_id).execute()
+        
+        if not session_response.data or len(session_response.data) == 0:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = session_response.data[0]
+        
+        # Get all answers
+        answers_response = supabase.table("interview_answers").select("*").eq("session_id", session_id).order("question_number").execute()
+        answers = answers_response.data if answers_response.data else []
+        
+        if not answers:
+            raise HTTPException(status_code=400, detail="No answers found for this session")
+        
+        # Get conversation history
+        questions_response = supabase.table("interview_questions").select("*").eq("session_id", session_id).order("question_number").execute()
+        
+        conversation_history = []
+        for q in (questions_response.data or []):
+            conversation_history.append({"role": "ai", "content": q["question"]})
+        for a in answers:
+            conversation_history.append({"role": "user", "content": a["user_answer"]})
+        
+        # Prepare session data
+        session_data = {
+            "session_id": session_id,
+            "technical_skills": session.get("skills", []),
+            "conversation_history": conversation_history,
+            "current_question_index": len(questions_response.data or []),
+            "questions_asked": [q["question"] for q in (questions_response.data or [])],
+            "answers_received": [a["user_answer"] for a in answers]
+        }
+        
+        # Get all scores
+        all_scores = []
+        for answer in answers:
+            all_scores.append({
+                "relevance": answer.get("relevance_score", 0),
+                "technical_accuracy": answer.get("technical_accuracy_score", 0),
+                "communication": answer.get("communication_score", 0),
+                "overall": answer.get("overall_score", 0)
+            })
+        
+        # Generate feedback
+        feedback = technical_interview_engine.generate_final_feedback(
+            session_data=session_data,
+            conversation_history=conversation_history,
+            all_scores=all_scores
+        )
+        
+        # Update session status
+        supabase.table("interview_sessions").update({"session_status": "completed"}).eq("id", session_id).execute()
+        
+        return feedback
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating feedback: {str(e)}")
+
+@router.post("/technical/{session_id}/end")
+async def end_technical_interview(
+    session_id: str,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    End the technical interview session
+    """
+    try:
+        # Update session status
+        supabase.table("interview_sessions").update({"session_status": "completed"}).eq("id", session_id).execute()
+        
+        return {"message": "Interview ended successfully", "session_id": session_id}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error ending interview: {str(e)}")
+
+@router.post("/speech-to-text")
+async def speech_to_text(
+    audio: UploadFile = File(...),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Convert speech audio to text using OpenAI Whisper
+    """
+    try:
+        # Check if OpenAI is available
+        if not technical_interview_engine.openai_available or technical_interview_engine.client is None:
+            raise HTTPException(status_code=503, detail="Speech-to-text service is not available. OpenAI API key is required.")
+        
+        # Save uploaded audio to temporary file
+        file_extension = os.path.splitext(audio.filename)[1] if audio.filename else ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+            content = await audio.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        try:
+            # Transcribe using OpenAI Whisper
+            with open(tmp_file_path, "rb") as audio_file:
+                transcript = technical_interview_engine.client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="en"
+                )
+            
+            text = transcript.text
+            
+            return {"text": text, "language": "en"}
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error converting speech to text: {str(e)}")
+
+@router.get("/text-to-speech")
+async def text_to_speech(
+    text: str,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Convert text to speech using OpenAI TTS
+    Returns audio file as streaming response
+    """
+    try:
+        # Check if OpenAI is available
+        if not technical_interview_engine.openai_available or technical_interview_engine.client is None:
+            raise HTTPException(status_code=503, detail="Text-to-speech service is not available. OpenAI API key is required.")
+        
+        if not text:
+            raise HTTPException(status_code=400, detail="text parameter is required")
+        
+        # Generate speech using OpenAI TTS
+        response = technical_interview_engine.client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",  # Options: alloy, echo, fable, onyx, nova, shimmer
+            input=text[:500]  # Limit text length
+        )
+        
+        # Return audio as streaming response
+        audio_data = response.content
+        
+        return StreamingResponse(
+            io.BytesIO(audio_data),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": "inline; filename=speech.mp3"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error converting text to speech: {str(e)}")
 
