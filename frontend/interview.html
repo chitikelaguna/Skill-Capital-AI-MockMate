@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technical Interview - Skill Capital AI MockMate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .interview-page-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .interview-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .interview-header h1 {
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        .progress-indicator {
+            display: inline-block;
+            padding: 8px 16px;
+            background: var(--accent-light);
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-weight: 600;
+        }
+
+        .question-card {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 4px 20px var(--shadow-md);
+            border: 1px solid var(--border-light);
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .question-subtitle {
+            color: var(--text-light);
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .question-text {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .answer-section {
+            margin: 30px 0;
+        }
+
+        .answer-input-area {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .answer-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Poppins', sans-serif;
+            resize: vertical;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .answer-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(142, 197, 252, 0.1);
+        }
+
+        .voice-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .voice-button {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            font-size: 56px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(142, 197, 252, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin: 20px auto;
+        }
+
+        .voice-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 6px 25px rgba(142, 197, 252, 0.7);
+        }
+
+        .voice-button.recording {
+            background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 4px 20px rgba(239, 83, 80, 0.6);
+        }
+
+        .voice-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .voice-status {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        /* Sound Wave Animation */
+        .sound-wave {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            height: 50px;
+            margin: 20px 0;
+        }
+
+        .sound-wave.hidden {
+            display: none;
+        }
+
+        .wave-bar {
+            width: 4px;
+            background: var(--primary);
+            border-radius: 2px;
+            animation: wave 1.2s ease-in-out infinite;
+        }
+
+        .wave-bar:nth-child(1) { animation-delay: 0s; height: 20px; }
+        .wave-bar:nth-child(2) { animation-delay: 0.1s; height: 35px; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; height: 50px; }
+        .wave-bar:nth-child(4) { animation-delay: 0.3s; height: 40px; }
+        .wave-bar:nth-child(5) { animation-delay: 0.4s; height: 30px; }
+        .wave-bar:nth-child(6) { animation-delay: 0.5s; height: 45px; }
+        .wave-bar:nth-child(7) { animation-delay: 0.6s; height: 35px; }
+        .wave-bar:nth-child(8) { animation-delay: 0.7s; height: 25px; }
+        .wave-bar:nth-child(9) { animation-delay: 0.8s; height: 40px; }
+        .wave-bar:nth-child(10) { animation-delay: 0.9s; height: 30px; }
+
+        @keyframes wave {
+            0%, 100% {
+                transform: scaleY(0.5);
+                opacity: 0.7;
+            }
+            50% {
+                transform: scaleY(1);
+                opacity: 1;
+            }
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-light);
+        }
+
+        .btn-danger {
+            background: #ef5350;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c62828;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .summary-section {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 2px 12px var(--shadow-sm);
+        }
+
+        .summary-section h2 {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .score-display {
+            text-align: center;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .score-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin: 10px 0;
+        }
+
+        .summary-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .summary-item h3 {
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .summary-item ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .summary-item li {
+            padding: 5px 0;
+            color: var(--text-primary);
+        }
+
+        .summary-item li:before {
+            content: "• ";
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-light);
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border-light);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #c62828;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <img src="logo.png" alt="Skill Capital AI MockMate Logo" class="header-logo">
+                <div class="header-text">
+                    <h1>Technical Interview</h1>
+                    <p class="subtitle">AI-Powered Voice Interview Experience</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="interview-page-container">
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-state">
+                    <div class="spinner"></div>
+                    <h2 style="color: var(--text-secondary);">Initializing Interview...</h2>
+                    <p style="color: var(--text-light);">Please wait while we prepare your interview questions.</p>
+                </div>
+
+                <!-- Interview Interface -->
+                <div id="interviewInterface" class="hidden">
+                    <!-- Progress Indicator -->
+                    <div class="interview-header">
+                        <div class="progress-indicator" id="progressIndicator">Question 1 of 10</div>
+                    </div>
+
+                    <!-- Question Card -->
+                    <div class="question-card">
+                        <p class="question-subtitle">AI is asking based on your resume skills.</p>
+                        <div class="question-text" id="questionText">Loading question...</div>
+                    </div>
+
+                    <!-- Answer Section -->
+                    <div class="answer-section">
+                        <!-- Voice Controls -->
+                        <div class="voice-controls">
+                            <button class="voice-button" id="voiceButton" title="Click to record your answer">
+                                🎤
+                            </button>
+                            
+                            <!-- Sound Wave Animation -->
+                            <div class="sound-wave hidden" id="soundWave">
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                                <div class="wave-bar"></div>
+                            </div>
+                            
+                            <div class="voice-status" id="voiceStatus">Click the microphone to start recording</div>
+                            
+                            <!-- Progress Indicator -->
+                            <div class="progress-indicator" id="questionProgress" style="margin-top: 20px;">Question 1 of 10</div>
+                        </div>
+
+                        <!-- Optional Text Input (Hidden by default, can be toggled) -->
+                        <div class="answer-input-area hidden" id="textInputArea">
+                            <label for="answerTextarea" style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-weight: 500;">
+                                Type your answer (optional):
+                            </label>
+                            <textarea 
+                                id="answerTextarea" 
+                                class="answer-textarea" 
+                                placeholder="You can type your answer here or use voice recording above..."
+                            ></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="action-buttons" style="margin-top: 40px;">
+                            <button class="btn btn-primary" id="submitAnswerBtn" disabled>Submit Answer</button>
+                            <button class="btn btn-danger" id="endInterviewBtn" style="background: #ef5350; color: white;">End Interview</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Section -->
+                <div id="summarySection" class="summary-section hidden">
+                    <h2>Interview Summary</h2>
+                    <div class="loading-state" id="summaryLoading">
+                        <div class="spinner"></div>
+                        <p>Generating your interview summary...</p>
+                    </div>
+                    <div id="summaryContent" class="hidden">
+                        <div class="score-display">
+                            <div style="font-size: 18px; color: var(--text-light);">Overall Technical Score</div>
+                            <div class="score-value" id="overallScore">0</div>
+                            <div style="font-size: 14px; color: var(--text-light);">out of 5.0</div>
+                        </div>
+
+                        <div class="summary-item">
+                            <h3>✨ Strengths</h3>
+                            <ul id="strengthsList"></ul>
+                        </div>
+
+                        <div class="summary-item">
+                            <h3>📈 Areas for Improvement</h3>
+                            <ul id="weakAreasList"></ul>
+                        </div>
+
+                        <div class="summary-item">
+                            <h3>💡 Recommendations</h3>
+                            <ul id="recommendationsList"></ul>
+                        </div>
+
+                        <div class="summary-item">
+                            <h3>📝 Summary</h3>
+                            <p id="summaryText" style="color: var(--text-primary); line-height: 1.6;"></p>
+                        </div>
+
+                        <div class="action-buttons" style="margin-top: 30px;">
+                            <button class="btn btn-primary" onclick="window.location.href='index.html'">Back to Dashboard</button>
+                            <button class="btn btn-secondary" onclick="window.location.href='technical-interview.html'">Start New Interview</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Skill Capital AI MockMate</p>
+        </footer>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://127.0.0.1:8000';
+        const TEST_USER_ID = 'test_user_001';
+
+        // State
+        let interviewSessionId = null;
+        let currentQuestion = null;
+        let currentQuestionNumber = 0;
+        let totalQuestions = 10;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let interviewActive = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            init();
+        });
+
+        async function init() {
+            // Load config from backend
+            try {
+                const res = await fetch(`${API_BASE}/api/config`);
+                const config = await res.json();
+                if (config.test_user_id) {
+                    window.TEST_USER_ID = config.test_user_id;
+                }
+            } catch (e) {
+                console.warn('Config load failed, using default');
+            }
+
+            // Setup event listeners
+            setupEventListeners();
+
+            // Start interview
+            await startInterview();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('voiceButton').addEventListener('click', toggleRecording);
+            document.getElementById('submitAnswerBtn').addEventListener('click', submitAnswer);
+            document.getElementById('endInterviewBtn').addEventListener('click', endInterview);
+            document.getElementById('answerTextarea').addEventListener('input', () => {
+                const hasText = document.getElementById('answerTextarea').value.trim().length > 0;
+                document.getElementById('submitAnswerBtn').disabled = !hasText && !isRecording;
+            });
+        }
+
+        async function startInterview() {
+            try {
+                const userId = window.TEST_USER_ID || TEST_USER_ID;
+                
+                console.log('[INTERVIEW] Starting interview for user:', userId);
+                
+                const response = await fetch(`${API_BASE}/api/interview/technical/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to start interview: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('[INTERVIEW] Interview started:', data);
+                
+                interviewSessionId = data.session_id;
+                currentQuestion = data.question;
+                currentQuestionNumber = data.question_number;
+                totalQuestions = data.total_questions;
+                interviewActive = true;
+
+                // Hide loading, show interview
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('interviewInterface').classList.remove('hidden');
+
+                // Display question
+                displayQuestion(data.question, data.question_number);
+                
+                // Play audio - use the question text directly
+                if (data.question) {
+                    // Play TTS for the question
+                    playAudio(data.question).catch(err => {
+                        console.warn('[TTS] Could not play audio, continuing without audio:', err);
+                    });
+                } else if (data.audio_url) {
+                    // Fallback to audio_url if provided
+                    playAudio(data.audio_url).catch(err => {
+                        console.warn('[TTS] Could not play audio URL, continuing without audio:', err);
+                    });
+                }
+
+            } catch (error) {
+                console.error('[INTERVIEW] Start error:', error);
+                document.getElementById('loadingState').innerHTML = `
+                    <div class="error-message">
+                        <h3>Failed to Start Interview</h3>
+                        <p>${error.message || 'Please ensure you have uploaded a resume with technical skills.'}</p>
+                        <button class="btn btn-primary" onclick="window.location.href='technical-interview.html'" style="margin-top: 15px;">
+                            Go Back
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function displayQuestion(question, questionNumber) {
+            document.getElementById('questionText').textContent = question;
+            document.getElementById('progressIndicator').textContent = `Question ${questionNumber} of ${totalQuestions}`;
+            document.getElementById('questionProgress').textContent = `Question ${questionNumber} of ${totalQuestions}`;
+            currentQuestion = question;
+            currentQuestionNumber = questionNumber;
+        }
+
+        async function toggleRecording() {
+            if (!interviewActive) return;
+
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                console.log('[RECORDING] Requesting microphone access...');
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
+                });
+                
+                console.log('[RECORDING] Microphone access granted');
+                
+                // Determine the best MIME type supported
+                let mimeType = 'audio/webm';
+                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    mimeType = 'audio/webm;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    mimeType = 'audio/webm';
+                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    mimeType = 'audio/mp4';
+                }
+                
+                console.log('[RECORDING] Using MIME type:', mimeType);
+                
+                const options = { mimeType: mimeType };
+                mediaRecorder = new MediaRecorder(stream, options);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) {
+                        console.log('[RECORDING] Data chunk received, size:', event.data.size);
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onerror = (event) => {
+                    console.error('[RECORDING] MediaRecorder error:', event.error);
+                    document.getElementById('voiceStatus').textContent = 'Recording error occurred. Please try again.';
+                };
+
+                mediaRecorder.onstop = async () => {
+                    console.log('[RECORDING] Recording stopped, chunks:', audioChunks.length);
+                    const audioBlob = new Blob(audioChunks, { type: mimeType });
+                    console.log('[RECORDING] Audio blob created, size:', audioBlob.size, 'type:', audioBlob.type);
+                    
+                    if (audioBlob.size === 0) {
+                        document.getElementById('voiceStatus').textContent = 'No audio recorded. Please try again.';
+                        document.getElementById('soundWave').classList.add('hidden');
+                        return;
+                    }
+                    
+                    await processAudioAnswer(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                    // Hide sound wave
+                    document.getElementById('soundWave').classList.add('hidden');
+                };
+
+                // Start recording with timeslice to ensure data is available
+                mediaRecorder.start(100); // Collect data every 100ms
+                isRecording = true;
+                document.getElementById('voiceButton').classList.add('recording');
+                document.getElementById('voiceStatus').textContent = 'Recording... Click again to stop';
+                document.getElementById('soundWave').classList.remove('hidden');
+                document.getElementById('submitAnswerBtn').disabled = false;
+                
+                console.log('[RECORDING] Recording started');
+            } catch (error) {
+                console.error('[RECORDING] Error accessing microphone:', error);
+                let errorMessage = 'Microphone access denied. ';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Please allow microphone access in your browser settings and try again.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No microphone found. Please connect a microphone and try again.';
+                } else {
+                    errorMessage += error.message || 'Please try again.';
+                }
+                alert(errorMessage);
+                document.getElementById('voiceStatus').textContent = errorMessage;
+                // Show text input as fallback
+                document.getElementById('textInputArea').classList.remove('hidden');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('voiceButton').classList.remove('recording');
+                document.getElementById('voiceStatus').textContent = 'Processing your answer...';
+                document.getElementById('soundWave').classList.add('hidden');
+            }
+        }
+
+        async function processAudioAnswer(audioBlob) {
+            try {
+                console.log('[STT] Processing audio blob, size:', audioBlob.size, 'type:', audioBlob.type);
+                
+                if (audioBlob.size === 0) {
+                    throw new Error('Audio blob is empty');
+                }
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                console.log('[STT] Sending audio to backend...');
+                const sttResponse = await fetch(`${API_BASE}/api/interview/speech-to-text`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('[STT] Response status:', sttResponse.status);
+                
+                if (!sttResponse.ok) {
+                    const errorText = await sttResponse.text();
+                    console.error('[STT] Error response:', errorText);
+                    throw new Error(`Failed to convert speech to text: ${sttResponse.status} - ${errorText}`);
+                }
+
+                const sttData = await sttResponse.json();
+                console.log('[STT] Transcription received:', sttData);
+                
+                const transcribedText = sttData.text || sttData.transcript || '';
+
+                if (!transcribedText) {
+                    throw new Error('No transcription received');
+                }
+
+                // Show text input area and fill with transcribed text
+                document.getElementById('textInputArea').classList.remove('hidden');
+                document.getElementById('answerTextarea').value = transcribedText;
+                document.getElementById('voiceStatus').textContent = 'Answer transcribed. You can edit it or submit.';
+                document.getElementById('submitAnswerBtn').disabled = false;
+
+            } catch (error) {
+                console.error('[STT] Process audio error:', error);
+                document.getElementById('voiceStatus').textContent = `Error processing audio: ${error.message || 'Please try typing your answer.'}`;
+                // Show text input as fallback
+                document.getElementById('textInputArea').classList.remove('hidden');
+                document.getElementById('answerTextarea').placeholder = 'Please type your answer here...';
+            }
+        }
+
+        async function submitAnswer() {
+            const answerText = document.getElementById('answerTextarea').value.trim();
+            
+            if (!answerText) {
+                alert('Please provide an answer (type or record).');
+                return;
+            }
+
+            if (!interviewSessionId || !currentQuestion) {
+                alert('Interview session not initialized. Please refresh the page.');
+                return;
+            }
+
+            // Disable buttons during submission
+            document.getElementById('submitAnswerBtn').disabled = true;
+            document.getElementById('voiceButton').disabled = true;
+            document.getElementById('answerTextarea').disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/interview/technical/next`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: interviewSessionId,
+                        user_answer: answerText,
+                        previous_question: currentQuestion
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to submit answer: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.interview_completed) {
+                    // Interview is complete
+                    await showSummary();
+                } else {
+                    // Show next question
+                    displayQuestion(data.question, data.question_number);
+                    
+                    // Clear answer textarea and hide it
+                    document.getElementById('answerTextarea').value = '';
+                    document.getElementById('textInputArea').classList.add('hidden');
+                    
+                    // Play audio - use the question text directly
+                    if (data.question) {
+                        // Play TTS for the next question
+                        playAudio(data.question).catch(err => {
+                            console.warn('[TTS] Could not play audio, continuing without audio:', err);
+                        });
+                    } else if (data.audio_url) {
+                        // Fallback to audio_url if provided
+                        playAudio(data.audio_url).catch(err => {
+                            console.warn('[TTS] Could not play audio URL, continuing without audio:', err);
+                        });
+                    }
+
+                    // Re-enable controls
+                    document.getElementById('submitAnswerBtn').disabled = true;
+                    document.getElementById('voiceButton').disabled = false;
+                    document.getElementById('answerTextarea').disabled = false;
+                    document.getElementById('voiceStatus').textContent = 'Click the microphone to start recording';
+                }
+
+            } catch (error) {
+                console.error('Submit answer error:', error);
+                alert(`Error submitting answer: ${error.message || 'Please try again.'}`);
+                
+                // Re-enable controls
+                document.getElementById('submitAnswerBtn').disabled = false;
+                document.getElementById('voiceButton').disabled = false;
+                document.getElementById('answerTextarea').disabled = false;
+            }
+        }
+
+        async function showSummary() {
+            interviewActive = false;
+            
+            // Hide interview interface, show summary
+            document.getElementById('interviewInterface').classList.add('hidden');
+            document.getElementById('summarySection').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/interview/technical/${interviewSessionId}/summary`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to get interview summary');
+                }
+
+                const summary = await response.json();
+
+                // Display summary
+                document.getElementById('overallScore').textContent = (summary.overall_score || 0).toFixed(1);
+                
+                const strengthsList = document.getElementById('strengthsList');
+                strengthsList.innerHTML = (summary.strengths || []).map(s => `<li>${s}</li>`).join('') || '<li>No specific strengths identified.</li>';
+
+                const weakAreasList = document.getElementById('weakAreasList');
+                weakAreasList.innerHTML = (summary.weak_areas || []).map(w => `<li>${w}</li>`).join('') || '<li>No specific areas for improvement identified.</li>';
+
+                const recommendationsList = document.getElementById('recommendationsList');
+                recommendationsList.innerHTML = (summary.recommendations || []).map(r => `<li>${r}</li>`).join('') || '<li>No specific recommendations.</li>';
+
+                document.getElementById('summaryText').textContent = summary.summary || 'No summary available.';
+
+                document.getElementById('summaryLoading').classList.add('hidden');
+                document.getElementById('summaryContent').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Get summary error:', error);
+                document.getElementById('summaryLoading').innerHTML = `
+                    <div class="error-message">
+                        <p>Failed to generate summary. ${error.message || ''}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function playAudio(textOrUrl) {
+            if (!textOrUrl) return;
+            
+            try {
+                let text = textOrUrl;
+                
+                // If it's a URL, extract text from it or use it directly
+                if (textOrUrl.startsWith('http')) {
+                    // Try to extract text from query parameter
+                    try {
+                        const url = new URL(textOrUrl);
+                        const textParam = url.searchParams.get('text');
+                        if (textParam) {
+                            text = decodeURIComponent(textParam);
+                        } else {
+                            // If it's a direct audio URL, play it
+                            const audio = new Audio(textOrUrl);
+                            await audio.play();
+                            return;
+                        }
+                    } catch (e) {
+                        // Not a valid URL, treat as text
+                        text = textOrUrl;
+                    }
+                }
+                
+                if (!text || text.trim().length === 0) {
+                    console.warn('[TTS] No text provided for TTS');
+                    return;
+                }
+                
+                console.log('[TTS] Requesting speech for:', text.substring(0, 50) + '...');
+                
+                const response = await fetch(`${API_BASE}/api/interview/text-to-speech`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`TTS failed: ${response.status} - ${errorText}`);
+                }
+                
+                // Get audio blob
+                const audioBlob = await response.blob();
+                console.log('[TTS] Received audio blob, size:', audioBlob.size);
+                
+                if (audioBlob.size === 0) {
+                    throw new Error('Empty audio blob received');
+                }
+                
+                const audioUrl_obj = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl_obj);
+                
+                // Show playing indicator
+                document.getElementById('voiceStatus').textContent = 'AI is speaking the question...';
+                
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl_obj);
+                    document.getElementById('voiceStatus').textContent = 'Click the microphone to start recording';
+                };
+                
+                audio.onerror = (error) => {
+                    console.error('[TTS] Audio playback error:', error);
+                    URL.revokeObjectURL(audioUrl_obj);
+                    document.getElementById('voiceStatus').textContent = 'Audio playback failed. Question is displayed above.';
+                };
+                
+                await audio.play();
+                console.log('[TTS] Audio played successfully');
+                
+            } catch (error) {
+                console.error('[TTS] Error playing audio:', error);
+                document.getElementById('voiceStatus').textContent = 'Audio playback unavailable. Question is displayed above.';
+                // Don't block the interview flow if TTS fails
+            }
+        }
+
+        async function endInterview() {
+            if (confirm('Are you sure you want to end the interview? Your progress will be saved.')) {
+                interviewActive = false;
+                
+                if (isRecording) {
+                    stopRecording();
+                }
+
+                if (interviewSessionId) {
+                    try {
+                        await fetch(`${API_BASE}/api/interview/technical/${interviewSessionId}/end`, {
+                            method: 'POST'
+                        });
+                    } catch (error) {
+                        console.error('Error ending interview:', error);
+                    }
+                }
+
+                // Show summary
+                await showSummary();
+            }
+        }
+    </script>
+</body>
+</html>
+

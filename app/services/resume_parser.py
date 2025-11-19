@@ -150,12 +150,12 @@ class ResumeParser:
                         except Exception as page_error:
                             print(f"[WARNING] Error extracting text from page {page_num + 1}: {str(page_error)}")
                             continue
-                    
-                    if not text or len(text.strip()) < 10:
-                        raise Exception("PDF file appears to be empty or contains no extractable text.")
-                    
-                    print(f"[DEBUG] Total text extracted with pdfplumber: {len(text)} characters")
-                    return text
+                        
+                        if not text or len(text.strip()) < 10:
+                            raise Exception("PDF file appears to be empty or contains no extractable text.")
+                        
+                        print(f"[DEBUG] Total text extracted with pdfplumber: {len(text)} characters")
+                        return text
             except ImportError:
                 raise Exception(
                     "PDF parsing libraries not available. Please install one of: "
@@ -163,8 +163,10 @@ class ResumeParser:
                 )
         except Exception as e:
             error_msg = str(e)
+            error_msg_lower = error_msg.lower()  # Cache lowercased string
             print(f"[ERROR] Fallback PDF parsing error: {error_msg}")
-            if "not a PDF" in error_msg.lower() or "invalid" in error_msg.lower() or "cannot read" in error_msg.lower():
+            # Optimized: use cached lowercased string instead of multiple .lower() calls
+            if "not a pdf" in error_msg_lower or "invalid" in error_msg_lower or "cannot read" in error_msg_lower:
                 raise Exception("The file is not a valid PDF document. Please upload a valid PDF file.")
             raise Exception(f"Error extracting text from PDF: {str(e)}")
     
@@ -208,8 +210,10 @@ class ResumeParser:
             return text
         except Exception as e:
             error_msg = str(e)
+            error_msg_lower = error_msg.lower()  # Cache lowercased string
             print(f"[ERROR] DOCX parsing error: {error_msg}")
-            if "not a docx" in error_msg.lower() or "invalid" in error_msg.lower() or "corrupt" in error_msg.lower() or "cannot open" in error_msg.lower():
+            # Optimized: use cached lowercased string instead of multiple .lower() calls
+            if "not a docx" in error_msg_lower or "invalid" in error_msg_lower or "corrupt" in error_msg_lower or "cannot open" in error_msg_lower:
                 raise Exception("The file is not a valid DOCX document. Please upload a valid DOCX file.")
             raise Exception(f"Error extracting text from DOCX: {str(e)}")
     
@@ -225,30 +229,41 @@ class ResumeParser:
             raise ValueError(f"Unsupported file type: {file_extension}")
     
     def extract_skills(self, text: str) -> List[str]:
-        """Extract skills from resume text"""
-        text_lower = text.lower()
+        """
+        Extract skills from resume text
+        Time Complexity: O(n*m) where n = text length, m = number of skills
+        Space Complexity: O(k) where k = found skills (max 20)
+        Optimization: Cache lowercased text, use set for O(1) membership check
+        """
+        text_lower = text.lower()  # Cache once
         found_skills = []
+        found_skills_set = set()  # Use set for O(1) membership check
         
         for skill in self.skill_keywords:
             # Check for skill in various formats
-            patterns = [
-                rf'\b{re.escape(skill)}\b',
-                rf'\b{re.escape(skill.replace(".", "\\."))}\b',
-            ]
+            skill_lower = skill.lower()  # Cache skill lowercase
+            # Optimized: text is already lowercased, no need for IGNORECASE flag
+            pattern = rf'\b{re.escape(skill_lower)}\b'
             
-            for pattern in patterns:
-                if re.search(pattern, text_lower, re.IGNORECASE):
-                    # Capitalize properly
-                    skill_formatted = skill.title() if '.' not in skill else skill.upper()
-                    if skill_formatted not in found_skills:
-                        found_skills.append(skill_formatted)
-                    break
+            if re.search(pattern, text_lower):
+                # Capitalize properly
+                skill_formatted = skill.title() if '.' not in skill else skill.upper()
+                if skill_formatted not in found_skills_set:
+                    found_skills.append(skill_formatted)
+                    found_skills_set.add(skill_formatted)
+                    if len(found_skills) >= 20:  # Early exit when limit reached
+                        break
         
         return found_skills[:20]  # Limit to top 20 skills
     
     def extract_experience_level(self, text: str) -> Optional[str]:
-        """Extract experience level from resume text"""
-        text_lower = text.lower()
+        """
+        Extract experience level from resume text
+        Time Complexity: O(n) where n = text length (single pass through patterns)
+        Space Complexity: O(1)
+        Optimization: Cache lowercased text, no IGNORECASE flag needed
+        """
+        text_lower = text.lower()  # Cache once
         
         # Patterns to match experience
         experience_patterns = [
@@ -258,18 +273,19 @@ class ResumeParser:
             (r'fresher|fresh\s*graduate|no\s*experience|entry\s*level', 'fresher'),
         ]
         
-        # Check for fresher first
-        for pattern, _ in experience_patterns:
-            if pattern.startswith('fresher'):
-                if re.search(pattern, text_lower, re.IGNORECASE):
-                    return "Fresher"
+        # Check for fresher first (optimized: single pattern check)
+        fresher_pattern = r'fresher|fresh\s*graduate|no\s*experience|entry\s*level'
+        if re.search(fresher_pattern, text_lower):
+            return "Fresher"
         
         # Check for years of experience
+        # Optimized: compile patterns once and reuse
         max_years = 0
         for pattern, _ in experience_patterns:
             if pattern.startswith('fresher'):
                 continue
-            matches = re.finditer(pattern, text_lower, re.IGNORECASE)
+            # Optimized: text is already lowercased, no IGNORECASE flag needed
+            matches = re.finditer(pattern, text_lower)
             for match in matches:
                 try:
                     years = int(match.group(1))
@@ -281,6 +297,7 @@ class ResumeParser:
             return f"{max_years}yrs"
         
         # Check for keywords that might indicate experience level
+        # Optimized: single regex with alternation instead of multiple searches
         if re.search(r'senior|lead|principal|architect', text_lower):
             return "5yrs+"
         elif re.search(r'mid|middle|intermediate', text_lower):
@@ -366,16 +383,27 @@ class ResumeParser:
         return keywords
     
     def extract_name(self, text: str) -> Optional[str]:
-        """Extract name from resume text (usually at the beginning)"""
+        """
+        Extract name from resume text (usually at the beginning)
+        Time Complexity: O(n) where n = number of lines checked (max 10)
+        Space Complexity: O(1)
+        Optimization: Cache excluded words set, optimize regex checks
+        """
         lines = text.split('\n')[:10]  # Check first 10 lines
+        # Optimized: cache excluded words in a set for O(1) lookup
+        excluded_words = {'email', 'phone', 'address', 'resume', 'cv'}
+        
         for line in lines:
             line = line.strip()
             if len(line) > 3 and len(line) < 50:  # Reasonable name length
                 # Check if it looks like a name (contains letters, may have spaces)
-                if re.match(r'^[A-Za-z\s\.\-]+$', line) and not any(word.lower() in ['email', 'phone', 'address', 'resume', 'cv'] for word in line.split()):
-                    # Check if it's not an email or phone
-                    if '@' not in line and not re.match(r'^[\d\s\-\+\(\)]+$', line):
-                        return line.title()
+                if re.match(r'^[A-Za-z\s\.\-]+$', line):
+                    # Optimized: use set for O(1) membership check instead of list
+                    line_words = {word.lower() for word in line.split()}
+                    if not line_words.intersection(excluded_words):
+                        # Check if it's not an email or phone
+                        if '@' not in line and not re.match(r'^[\d\s\-\+\(\)]+$', line):
+                            return line.title()
         return None
     
     def extract_email(self, text: str) -> Optional[str]:

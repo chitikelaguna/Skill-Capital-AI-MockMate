@@ -50,35 +50,37 @@ class TechnicalInterviewEngine:
         self,
         user_id: str,
         resume_skills: Optional[List[str]] = None,
-        resume_context: Optional[Dict[str, Any]] = None
+        resume_context: Optional[Dict[str, Any]] = None,
+        role: Optional[str] = None,
+        experience_level: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Start a new technical interview session
-        Extracts skills from resume if available
+        Start a new technical interview session enriched with resume-specific details
         """
-        # Extract technical skills from resume if provided
         technical_skills = resume_skills or []
+        resume_projects: List[str] = []
+        resume_domains: List[str] = []
         
         if resume_context:
-            # Extract skills from resume context
-            keywords = resume_context.get("keywords", {})
+            keywords = resume_context.get("keywords", {}) or {}
             technologies = keywords.get("technologies", [])
             tools = keywords.get("tools", [])
-            technical_skills.extend(technologies)
-            technical_skills.extend(tools)
+            additional_skills = resume_context.get("skills", []) or []
+            
+            for skill in technologies + tools + additional_skills:
+                if skill and skill not in technical_skills:
+                    technical_skills.append(skill)
+            
+            resume_projects = resume_context.get("projects", []) or keywords.get("projects", []) or []
+            resume_domains = resume_context.get("domains", []) or keywords.get("job_titles", []) or []
+            experience_level = experience_level or resume_context.get("experience_level")
         
-        # Remove duplicates
-        technical_skills = list(dict.fromkeys(technical_skills))[:20]  # Limit to 20 skills
+        technical_skills = list(dict.fromkeys(technical_skills))[:20]
         
-        # Initialize conversation history
-        conversation_history = []
-        
-        # Add welcome message
-        welcome_message = "Welcome to your technical interview! I'll be asking you questions based on your resume and technical skills. Let's begin!"
-        conversation_history.append({
+        conversation_history = [{
             "role": "ai",
-            "content": welcome_message
-        })
+            "content": "Welcome to your technical interview! I'll tailor each question to the skills and projects you highlighted in your resume."
+        }]
         
         return {
             "session_id": None,  # Will be set by the router
@@ -86,7 +88,11 @@ class TechnicalInterviewEngine:
             "conversation_history": conversation_history,
             "current_question_index": 0,
             "questions_asked": [],
-            "answers_received": []
+            "answers_received": [],
+            "resume_projects": resume_projects,
+            "resume_domains": resume_domains,
+            "role": role or "Technical Interview",
+            "experience_level": experience_level
         }
     
     def generate_next_question(
@@ -103,7 +109,7 @@ class TechnicalInterviewEngine:
         
         if not self.openai_available or self.client is None:
             # Fallback to predefined questions
-            return self._get_fallback_question(technical_skills, questions_asked)
+            return self._get_fallback_question(session_data, questions_asked)
         
         try:
             # Build context for question generation
@@ -173,7 +179,7 @@ Return ONLY the question text, nothing else."""
             
         except Exception as e:
             print(f"Error generating question with AI: {str(e)}")
-            return self._get_fallback_question(technical_skills, questions_asked)
+            return self._get_fallback_question(session_data, questions_asked)
     
     def evaluate_answer(
         self,
@@ -359,24 +365,38 @@ Generate a professional, constructive feedback summary (3-4 sentences)."""
             "recommendations": recommendations[:5]
         }
     
-    def _get_fallback_question(self, technical_skills: List[str], questions_asked: List[str]) -> Dict[str, Any]:
-        """Fallback questions if AI is not available"""
-        fallback_questions = [
-            "Tell me about your experience with {skill}.",
-            "How would you approach a problem involving {skill}?",
-            "What are the key concepts you know about {skill}?",
-            "Can you explain how {skill} works?",
-            "What challenges have you faced while working with {skill}?"
+    def _get_fallback_question(
+        self,
+        session_data: Dict[str, Any],
+        questions_asked: List[str]
+    ) -> Dict[str, Any]:
+        """Fallback questions that still leverage resume-driven context"""
+        technical_skills = session_data.get("technical_skills", []) or []
+        resume_projects = session_data.get("resume_projects", []) or []
+        resume_domains = session_data.get("resume_domains", []) or []
+        experience_level = session_data.get("experience_level")
+
+        skill = technical_skills[len(questions_asked) % len(technical_skills)] if technical_skills else "your core stack"
+        project = resume_projects[len(questions_asked) % len(resume_projects)] if resume_projects else ""
+        domain_label = resume_domains[0] if resume_domains else session_data.get("role") or "your recent role"
+
+        project_reference = project or f"your recent {domain_label} project"
+
+        templates = [
+            f"In '{project_reference}', how did you architect critical components using {skill}? Walk me through the design decisions.",
+            f"What trade-offs did you evaluate when scaling the {skill}-heavy modules in {project_reference}?",
+            f"Describe how you would refactor a legacy feature from {project_reference} using {skill} to improve reliability.",
+            f"Based on your experience with {skill}, how do you ensure observability and troubleshooting are baked into your solutions?",
+            f"How would you mentor a junior engineer to ramp up on {skill} while contributing to {project_reference}?"
         ]
-        
-        # Try to use a skill-based question
-        if technical_skills:
-            skill = technical_skills[0]
-            question_template = fallback_questions[len(questions_asked) % len(fallback_questions)]
-            question = question_template.format(skill=skill)
-        else:
-            question = "Tell me about your technical background and experience."
-        
+
+        if experience_level:
+            templates.append(
+                f"With {experience_level} under your belt, how do you decide when to introduce advanced {skill} patterns versus keeping implementations simple?"
+            )
+
+        question = templates[len(questions_asked) % len(templates)]
+
         return {
             "question": question,
             "question_type": "Technical",

@@ -86,8 +86,14 @@ async function startInterview() {
         interviewActive = true;
         conversationHistory = data.conversation_history || [];
 
+        // IMPORTANT: Once we have a session ID, keep interview section visible
+        // Don't hide it even if getting questions fails
+        document.getElementById('setupSection').classList.add('hidden');
+        document.getElementById('interviewSection').classList.remove('hidden');
+
         // Update status
         document.getElementById('interviewStatus').textContent = 'Interview Active';
+        document.getElementById('interviewStatus').classList.add('active');
         
         // Clear loading message
         const loadingMsg = document.getElementById('loadingMessage');
@@ -106,25 +112,47 @@ async function startInterview() {
         }
 
         // Get first question from AI
+        // If this fails, show error but keep interview section visible
         console.log('[INTERVIEW] Getting first question...');
-        await getNextQuestion();
+        try {
+            await getNextQuestion();
+        } catch (questionError) {
+            console.error('[INTERVIEW] Error getting first question:', questionError);
+            showError(`Failed to get first question: ${questionError.message || 'Please try again.'}`);
+            document.getElementById('voiceStatus').textContent = 'Error loading question. The interview session is active - you can try again.';
+            // Keep interview section visible - don't redirect
+        }
 
     } catch (error) {
         console.error('[INTERVIEW] Start interview error:', error);
         const errorMsg = error.message || 'Failed to start interview. Please try again.';
-        showError(errorMsg);
         
-        // Show setup section again
+        // Show alert to user instead of silently hiding
+        alert(`Failed to start interview: ${errorMsg}\n\nPlease ensure you have uploaded a resume and try again.`);
+        
+        // Keep interview section visible but show error
+        const container = document.getElementById('conversationContainer');
+        if (container) {
+            container.innerHTML = `<div class="error-message">${errorMsg}<br><br>Please check your resume upload and try again.</div>`;
+        }
+        
+        // Show setup section again so user can retry
         document.getElementById('setupSection').classList.remove('hidden');
         document.getElementById('interviewSection').classList.add('hidden');
         document.getElementById('interviewStatus').textContent = 'Ready to Start';
         document.getElementById('interviewStatus').classList.remove('active');
+        
+        // Reset interview state
+        interviewActive = false;
+        interviewSessionId = null;
     }
 }
 
 async function getNextQuestion() {
     if (!interviewSessionId) {
         console.error('[INTERVIEW] No session ID available');
+        showError('No interview session found. Please start the interview again.');
+        // Don't redirect - just show error and let user retry
         return;
     }
 
@@ -186,7 +214,16 @@ async function getNextQuestion() {
 
     } catch (error) {
         console.error('[INTERVIEW] Get question error:', error);
-        showError(`Failed to get question: ${error.message || 'Please try again.'}`);
+        const errorMsg = `Failed to get question: ${error.message || 'Please try again.'}`;
+        showError(errorMsg);
+        
+        // Show alert for critical errors
+        if (error.message && error.message.includes('500')) {
+            alert(`Interview error: ${errorMsg}\n\nThe interview session may have encountered an issue. You can try starting a new interview.`);
+        }
+        
+        // Keep interview section visible - don't redirect
+        document.getElementById('voiceStatus').textContent = 'Error occurred. Please try recording again or start a new interview.';
     }
 }
 
@@ -224,7 +261,12 @@ async function startRecording() {
         document.getElementById('voiceStatus').textContent = 'Recording... Click again to stop';
     } catch (error) {
         console.error('Error accessing microphone:', error);
-        showError('Microphone access denied. Please allow microphone access and try again.');
+        const errorMsg = 'Microphone access denied. Please allow microphone access and try again.';
+        showError(errorMsg);
+        // Show alert but don't redirect
+        alert(errorMsg);
+        // Keep interview section visible
+        document.getElementById('voiceStatus').textContent = 'Microphone access required. Please allow access and try again.';
     }
 }
 
@@ -263,8 +305,10 @@ async function processAudioAnswer(audioBlob) {
 
     } catch (error) {
         console.error('Process audio error:', error);
-        showError('Failed to process your answer. Please try again.');
-        document.getElementById('voiceStatus').textContent = 'Click the microphone to record your answer';
+        const errorMsg = 'Failed to process your answer. Please try again.';
+        showError(errorMsg);
+        document.getElementById('voiceStatus').textContent = 'Error processing answer. Click the microphone to try again.';
+        // Don't redirect - keep interview active
     }
 }
 
@@ -321,7 +365,10 @@ async function submitAnswer(answer) {
 
     } catch (error) {
         console.error('Submit answer error:', error);
-        showError('Failed to submit answer. Please try again.');
+        const errorMsg = 'Failed to submit answer. Please try again.';
+        showError(errorMsg);
+        document.getElementById('voiceStatus').textContent = 'Error submitting answer. You can try recording again.';
+        // Don't redirect - keep interview active
     }
 }
 

@@ -3,7 +3,7 @@ AI Question Generator Service using OpenAI and LangChain
 Generates interview questions based on role, skills, and experience level
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from app.schemas.interview import InterviewQuestion
 from app.config.settings import settings
 import json
@@ -117,7 +117,7 @@ Return only valid JSON array, no additional text.""")
         
         if not self.openai_available:
             # Use fallback questions if OpenAI is not available
-            return self._get_fallback_questions(role, experience_level, skills)
+            return self._get_fallback_questions(role, experience_level, skills, resume_context)
         
         try:
             # Format skills list
@@ -205,7 +205,7 @@ Return only valid JSON array, no additional text.""")
             # Ensure we have questions in all categories
             if len(questions) < 10:
                 # Add fallback questions if not enough generated
-                questions.extend(self._get_fallback_questions(role, experience_level, skills))
+                questions.extend(self._get_fallback_questions(role, experience_level, skills, resume_context))
             
             # Limit to 15 questions max
             return questions[:15]
@@ -213,88 +213,112 @@ Return only valid JSON array, no additional text.""")
         except Exception as e:
             # Fallback to predefined questions if AI generation fails
             print(f"Error generating questions with AI: {str(e)}")
-            return self._get_fallback_questions(role, experience_level, skills)
+            return self._get_fallback_questions(role, experience_level, skills, resume_context)
     
     def _get_fallback_questions(
         self,
         role: str,
         experience_level: str,
-        skills: List[str]
+        skills: List[str],
+        resume_context: Optional[Dict[str, Any]] = None
     ) -> List[InterviewQuestion]:
-        """Fallback questions if AI generation fails"""
-        
-        questions = []
-        
-        # HR Questions
-        hr_questions = [
-            "Tell me about yourself and your background.",
-            "Why are you interested in this role?",
-            "What are your strengths and weaknesses?",
-            "Describe a challenging situation you faced and how you handled it.",
-            "Where do you see yourself in 5 years?",
+        """Fallback questions that still leverage resume details"""
+        resume_context = resume_context or {}
+        contextual_skills = list(dict.fromkeys(skills or resume_context.get("skills", []) or []))
+        projects = resume_context.get("projects") or resume_context.get("keywords", {}).get("projects", []) or []
+        keywords = resume_context.get("keywords") or {}
+        job_titles = resume_context.get("domains") or keywords.get("job_titles", []) or []
+        experience_label = resume_context.get("experience_level") or experience_level
+
+        domain_label = job_titles[0] if job_titles else role
+        project_default = projects[0] if projects else f"your recent {domain_label} project"
+
+        questions: List[InterviewQuestion] = []
+        used_questions: set = set()
+
+        def add_question(q_type: str, text: str):
+            normalized = text.strip()
+            if normalized and normalized not in used_questions:
+                questions.append(InterviewQuestion(type=q_type, question=normalized))
+                used_questions.add(normalized)
+
+        def pick_skill(index: int = 0) -> str:
+            if contextual_skills:
+                return contextual_skills[index % len(contextual_skills)]
+            return "your core technology stack"
+
+        def pick_project(index: int = 0) -> str:
+            if projects:
+                return projects[index % len(projects)]
+            return project_default
+
+        # HR / Behavioral questions referencing real projects and skills
+        for idx, project in enumerate(projects[:3]):
+            add_question(
+                "HR",
+                f"Walk me through the objectives, team dynamics, and final impact of your '{project}' project."
+            )
+        for idx, skill in enumerate(contextual_skills[:3]):
+            add_question(
+                "HR",
+                f"Describe a challenging collaboration where you relied heavily on {skill}. How did you handle stakeholder expectations?"
+            )
+        if experience_label:
+            add_question(
+                "HR",
+                f"How has your {experience_label} shaped the way you mentor peers and handle feedback on complex projects?"
+            )
+        else:
+            add_question(
+                "HR",
+                f"In the context of {project_default}, how do you ensure healthy communication across cross-functional teams?"
+            )
+
+        # Technical questions tied to resume skills/projects
+        for idx in range(max(3, len(contextual_skills))):
+            skill = pick_skill(idx)
+            project = pick_project(idx)
+            add_question(
+                "Technical",
+                f"In '{project}', how did you architect and optimize the components built with {skill}? Describe key trade-offs you made."
+            )
+            add_question(
+                "Technical",
+                f"Suppose you had to extend the solution from '{project}' using {skill}. What patterns or design decisions would you revisit and why?"
+            )
+
+        # Problem-solving / behavioral-technical hybrids
+        scenarios = [
+            "a production outage impacting a critical workflow",
+            "a performance regression after a major feature launch",
+            "an urgent scalability requirement from the business",
+            "a regression introduced by a third-party integration"
         ]
-        
-        # Technical Questions (role-specific)
-        technical_questions = {
-            "Python Developer": [
-                "Explain the difference between list and tuple in Python.",
-                "What are Python decorators and how do you use them?",
-                "Explain the GIL (Global Interpreter Lock) in Python.",
-                "How do you handle exceptions in Python?",
-                "What is the difference between __str__ and __repr__?",
-            ],
-            "ServiceNow Engineer": [
-                "Explain the ServiceNow data model and table structure.",
-                "What is the difference between client scripts and business rules?",
-                "How do you handle ServiceNow integrations?",
-                "Explain the ServiceNow workflow engine.",
-                "What are best practices for ServiceNow development?",
-            ],
-            "DevOps": [
-                "Explain CI/CD pipeline and its benefits.",
-                "What is containerization and how does Docker work?",
-                "Explain Kubernetes architecture and components.",
-                "How do you handle infrastructure as code?",
-                "What monitoring tools have you used and why?",
-            ],
-            "Fresher": [
-                "What programming languages are you familiar with?",
-                "Explain basic data structures like arrays and linked lists.",
-                "What is version control and how do you use Git?",
-                "Describe the software development lifecycle.",
-                "How do you approach learning new technologies?",
-            ],
-        }
-        
-        # Problem-solving Questions
-        problem_questions = [
-            "How would you debug a production issue that's affecting multiple users?",
-            "Describe how you would design a scalable system for [specific use case].",
-            "How would you optimize a slow-performing application?",
-            "Explain your approach to code review and quality assurance.",
-            "How do you prioritize tasks when working on multiple projects?",
-        ]
-        
-        # Add HR questions
-        for q in hr_questions[:3]:
-            questions.append(InterviewQuestion(type="HR", question=q))
-        
-        # Add technical questions based on role
-        role_tech = technical_questions.get(role, technical_questions["Fresher"])
-        for q in role_tech[:5]:
-            questions.append(InterviewQuestion(type="Technical", question=q))
-        
-        # Add problem-solving questions
-        for q in problem_questions[:3]:
-            questions.append(InterviewQuestion(type="Problem-solving", question=q))
-        
-        # Add skill-specific questions if skills provided
-        if skills:
-            for skill in skills[:3]:
-                questions.append(InterviewQuestion(
-                    type="Technical",
-                    question=f"Tell me about your experience with {skill}."
-                ))
+        for idx, scenario in enumerate(scenarios):
+            skill = pick_skill(idx)
+            project = pick_project(idx)
+            add_question(
+                "Problem-solving",
+                f"During {project}, if you encountered {scenario}, how would you leverage {skill} and past lessons to diagnose and fix the issue quickly?"
+            )
+
+        # Ensure a healthy mix by referencing domain expertise if available
+        if domain_label:
+            add_question(
+                "Technical",
+                f"Based on your experience as a {domain_label}, what architecture considerations do you prioritize before writing any {pick_skill()} code?"
+            )
+
+        # Guarantee at least 12 personalized questions
+        fail_safe_index = 0
+        while len(questions) < 12:
+            skill = pick_skill(fail_safe_index)
+            project = pick_project(fail_safe_index)
+            add_question(
+                "Problem-solving",
+                f"How would you refactor a legacy module in '{project}' using {skill} to improve reliability and testability?"
+            )
+            fail_safe_index += 1
         
         return questions[:15]
 

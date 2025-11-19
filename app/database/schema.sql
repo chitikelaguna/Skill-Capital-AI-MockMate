@@ -141,6 +141,16 @@ CREATE TABLE IF NOT EXISTS interview_answers (
     evaluated_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Interview Transcript Log (stores Q&A for technical and coding interviews)
+CREATE TABLE IF NOT EXISTS interview_transcripts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id TEXT NOT NULL,
+    interview_type TEXT NOT NULL,
+    question TEXT,
+    user_answer TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable Row Level Security for interview_answers
 ALTER TABLE interview_answers ENABLE ROW LEVEL SECURITY;
 
@@ -195,4 +205,39 @@ ALTER TABLE question_templates ENABLE ROW LEVEL SECURITY;
 -- Policy: Allow service role to manage all templates
 CREATE POLICY "Service role can manage question templates"
     ON question_templates FOR ALL
+    USING (auth.jwt()->>'role' = 'service_role');
+
+-- Coding Interview Results Table
+CREATE TABLE IF NOT EXISTS coding_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    question_number INTEGER NOT NULL,
+    question_text TEXT NOT NULL,
+    user_code TEXT NOT NULL,
+    correct_solution TEXT,
+    execution_output TEXT,
+    correctness BOOLEAN DEFAULT FALSE,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    difficulty_level TEXT CHECK (difficulty_level IN ('Easy', 'Medium', 'Hard')),
+    programming_language TEXT NOT NULL,
+    ai_feedback TEXT,
+    final_score INTEGER DEFAULT 0,
+    execution_time FLOAT,
+    test_cases_passed INTEGER DEFAULT 0,
+    total_test_cases INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_coding_results_user_id ON coding_results(user_id);
+CREATE INDEX IF NOT EXISTS idx_coding_results_session_id ON coding_results(session_id);
+CREATE INDEX IF NOT EXISTS idx_coding_results_timestamp ON coding_results(timestamp DESC);
+
+-- Enable RLS for coding_results
+ALTER TABLE coding_results ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow service role to manage all coding results
+CREATE POLICY "Service role can manage all coding results"
+    ON coding_results FOR ALL
     USING (auth.jwt()->>'role' = 'service_role');

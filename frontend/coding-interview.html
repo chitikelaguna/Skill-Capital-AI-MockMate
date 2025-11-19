@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Interview - Skill Capital AI MockMate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Ace Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/mode-python.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/mode-java.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/mode-javascript.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/mode-c_cpp.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/theme-monokai.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/theme-github.js" crossorigin="anonymous"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .coding-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 24px;
+            min-height: 100vh;
+        }
+
+        /* Question Panel - Enhanced */
+        .question-panel {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            max-height: calc(100vh - 48px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .question-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .question-panel::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .question-panel::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .question-panel::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e8eaf6;
+        }
+
+        .question-header h2 {
+            color: #1a237e;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        .question-meta {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .difficulty-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .difficulty-badge.easy {
+            background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+            color: #1b5e20;
+        }
+
+        .difficulty-badge.medium {
+            background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+            color: #e65100;
+        }
+
+        .difficulty-badge.hard {
+            background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
+            color: #b71c1c;
+        }
+
+        .progress-indicator {
+            font-size: 13px;
+            color: #546e7a;
+            font-weight: 600;
+            background: #f5f5f5;
+            padding: 6px 14px;
+            border-radius: 12px;
+        }
+
+        .question-content {
+            margin-bottom: 32px;
+        }
+
+        .question-content h3 {
+            color: #283593;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            margin-top: 28px;
+            letter-spacing: -0.3px;
+        }
+
+        .question-content h3:first-child {
+            margin-top: 0;
+        }
+
+        .question-content p {
+            color: #37474f;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        /* Enhanced Example Box */
+        .example-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            border-left: 5px solid #2196f3;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .example-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(33, 150, 243, 0.2);
+        }
+
+        .example-box h4 {
+            color: #1565c0;
+            font-size: 15px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .example-box h4::before {
+            content: "📝";
+            font-size: 18px;
+        }
+
+        .example-box pre {
+            background: #ffffff;
+            padding: 14px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            margin: 10px 0;
+            border: 1px solid #e1f5fe;
+            font-family: 'Courier New', 'Monaco', monospace;
+            line-height: 1.6;
+        }
+
+        .example-box pre strong {
+            color: #0277bd;
+            font-weight: 600;
+        }
+
+        .example-box p {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #546e7a;
+            font-style: italic;
+        }
+
+        /* Enhanced Constraints Box */
+        .constraints-box {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border-left: 5px solid #ff9800;
+            padding: 18px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.15);
+        }
+
+        .constraints-box h4 {
+            color: #e65100;
+            font-size: 15px;
+            margin-bottom: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .constraints-box h4::before {
+            content: "⚠️";
+            font-size: 18px;
+        }
+
+        .constraints-box p {
+            color: #bf360c;
+            font-size: 14px;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Topics Tags */
+        .topics-container {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e8eaf6;
+        }
+
+        .topics-label {
+            font-size: 13px;
+            color: #546e7a;
+            font-weight: 600;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .topics-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .topic-tag {
+            background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%);
+            color: #3f51b5;
+            padding: 6px 14px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #9fa8da;
+        }
+
+        /* Editor Panel - Enhanced */
+        .editor-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .editor-panel > * {
+            flex-shrink: 0;
+        }
+
+        .editor-header {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px 28px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .language-selector {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .language-selector label {
+            color: #37474f;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .language-selector select {
+            padding: 10px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #ffffff;
+            color: #37474f;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            min-width: 160px;
+            transition: all 0.3s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2337474f' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
+        }
+
+        .language-selector select:hover {
+            border-color: #2196f3;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+        }
+
+        .language-selector select:focus {
+            outline: none;
+            border-color: #2196f3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        .editor-container {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            flex: 1;
+            min-height: 450px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #codeEditor {
+            width: 100%;
+            height: 550px;
+        }
+
+        /* Enhanced IO Panel */
+        .io-panel {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .io-panel h3 {
+            color: #283593;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.3px;
+        }
+
+        .io-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #e8eaf6;
+            background: #f5f5f5;
+            padding: 4px;
+            border-radius: 10px;
+        }
+
+        .io-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #546e7a;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .io-tab:hover {
+            background: rgba(33, 150, 243, 0.1);
+            color: #2196f3;
+        }
+
+        .io-tab.active {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .io-content {
+            min-height: 180px;
+            max-height: 250px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .io-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .io-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .io-content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .io-content textarea {
+            width: 100%;
+            min-height: 180px;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 13px;
+            resize: vertical;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+
+        .io-content textarea:focus {
+            outline: none;
+            border-color: #2196f3;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        .io-content pre {
+            background: #f5f5f5;
+            padding: 16px;
+            border-radius: 10px;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+            line-height: 1.6;
+            border: 2px solid transparent;
+        }
+
+        .io-content .error {
+            color: #b71c1c;
+            background: #ffebee;
+            border-color: #ef5350;
+        }
+
+        .io-content .success {
+            color: #1b5e20;
+            background: #e8f5e9;
+            border-color: #66bb6a;
+        }
+
+        /* Enhanced Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 14px;
+            margin-top: 0;
+            padding-top: 20px;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            letter-spacing: 0.3px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(102, 187, 106, 0.4);
+        }
+
+        .btn-success:active:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(239, 83, 80, 0.4);
+        }
+
+        .btn-danger:active {
+            transform: translateY(-1px);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading State */
+        .loading-state {
+            text-align: center;
+            padding: 60px 40px;
+        }
+
+        .loading-state .loading {
+            width: 40px;
+            height: 40px;
+            border-width: 4px;
+            margin: 0 auto 20px;
+        }
+
+        .loading-state p {
+            color: #546e7a;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 0;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            color: white;
+            padding: 24px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-body {
+            padding: 24px;
+            color: #37474f;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            border-top: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+
+        .modal-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-btn-primary {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+
+        .modal-btn-secondary {
+            background: #e0e0e0;
+            color: #37474f;
+        }
+
+        .modal-btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: #ffffff;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            animation: slideUp 0.3s ease;
+            max-width: 400px;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        .toast.success {
+            border-left: 4px solid #66bb6a;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef5350;
+        }
+
+        .toast.info {
+            border-left: 4px solid #2196f3;
+        }
+
+        .toast-icon {
+            font-size: 24px;
+        }
+
+        .toast-message {
+            flex: 1;
+            color: #37474f;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Smooth Transitions */
+        .question-panel,
+        .editor-container,
+        .io-panel {
+            transition: opacity 0.3s ease;
+        }
+
+        .fade-out {
+            opacity: 0.5;
+        }
+
+        .fade-in {
+            opacity: 1;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .coding-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .question-panel {
+                max-height: 500px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .coding-container {
+                padding: 16px;
+            }
+
+            .question-panel,
+            .editor-header,
+            .editor-container,
+            .io-panel {
+                border-radius: 12px;
+                padding: 20px;
+            }
+
+            .question-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .question-meta {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            #codeEditor {
+                height: 400px;
+            }
+
+            .modal {
+                width: 95%;
+                margin: 20px;
+            }
+
+            .toast {
+                right: 16px;
+                top: 16px;
+                max-width: calc(100% - 32px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="coding-container">
+        <!-- Question Panel -->
+        <div class="question-panel">
+            <div class="question-header">
+                <h2>Coding Interview</h2>
+                <div class="question-meta">
+                    <span class="difficulty-badge" id="difficultyBadge">Medium</span>
+                    <span class="progress-indicator" id="progressIndicator">Question 1 of 5</span>
+                </div>
+            </div>
+            
+            <div class="question-content" id="questionContent">
+                <div class="loading-state">
+                    <div class="loading"></div>
+                    <p>Loading question...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Editor Panel -->
+        <div class="editor-panel">
+            <div class="editor-header">
+                <div class="language-selector">
+                    <label for="languageSelect">Language:</label>
+                    <select id="languageSelect">
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="c">C</option>
+                        <option value="cpp">C++</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="editor-container">
+                <div id="codeEditor"></div>
+            </div>
+
+            <div class="io-panel">
+                <h3>Input / Output</h3>
+                <div class="io-tabs">
+                    <button class="io-tab active" onclick="switchIOTab('input')">Input</button>
+                    <button class="io-tab" onclick="switchIOTab('output')">Output</button>
+                </div>
+                <div class="io-content" id="inputContent">
+                    <textarea id="inputTextarea" placeholder="Enter test input here..."></textarea>
+                </div>
+                <div class="io-content hidden" id="outputContent">
+                    <pre id="outputPre">No output yet. Click "Run Code" to execute your solution.</pre>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="runCodeBtn" onclick="runCode()">
+                    <span id="runCodeText">Run Code</span>
+                </button>
+                <button class="btn btn-success" id="submitCodeBtn" onclick="submitCode()">
+                    <span id="submitCodeText">Submit Code</span>
+                </button>
+                <button class="btn btn-danger" id="endInterviewBtn" onclick="endInterview()">End Interview</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header" id="modalHeader">Confirm</div>
+            <div class="modal-body" id="modalBody">Are you sure?</div>
+            <div class="modal-footer" id="modalFooter">
+                <button class="modal-btn modal-btn-secondary" id="modalCancel">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="modalConfirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-icon" id="toastIcon">ℹ️</span>
+        <span class="toast-message" id="toastMessage">Message</span>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        const TEST_USER_ID = window.TEST_USER_ID || 'test_user_001';
+
+        // State
+        let editor = null;
+        let currentSessionId = null;
+        let currentQuestion = null;
+        let currentQuestionNumber = 1;
+        let totalQuestions = 5;
+        let interviewActive = false;
+        let modalResolve = null;
+
+        // Modal Functions
+        function showModal(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
+            return new Promise((resolve) => {
+                document.getElementById('modalHeader').textContent = title;
+                document.getElementById('modalBody').textContent = message;
+                document.getElementById('modalConfirm').textContent = confirmText;
+                document.getElementById('modalCancel').textContent = cancelText;
+                document.getElementById('modalOverlay').classList.add('show');
+                modalResolve = resolve;
+
+                // Remove old event listeners
+                const confirmBtn = document.getElementById('modalConfirm');
+                const cancelBtn = document.getElementById('modalCancel');
+                const overlay = document.getElementById('modalOverlay');
+                
+                const newConfirm = () => {
+                    hideModal();
+                    resolve(true);
+                };
+                const newCancel = () => {
+                    hideModal();
+                    resolve(false);
+                };
+                const newOverlay = (e) => {
+                    if (e.target === overlay) {
+                        hideModal();
+                        resolve(false);
+                    }
+                };
+
+                confirmBtn.onclick = newConfirm;
+                cancelBtn.onclick = newCancel;
+                overlay.onclick = newOverlay;
+            });
+        }
+
+        function hideModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+            modalResolve = null;
+        }
+
+        // Toast Functions
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            const icons = {
+                success: '✅',
+                error: '❌',
+                info: 'ℹ️',
+                warning: '⚠️'
+            };
+            toastIcon.textContent = icons[type] || icons.info;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        // Initialize Ace Editor
+        function initEditor() {
+            editor = ace.edit("codeEditor");
+            editor.setTheme("ace/theme/github");
+            editor.getSession().setMode("ace/mode/python");
+            editor.setOptions({
+                fontSize: 14,
+                showPrintMargin: false,
+                enableBasicAutocompletion: true,
+                enableLiveAutocompletion: true,
+                tabSize: 4
+            });
+
+            // Set default code template
+            editor.setValue(`def solve():
+    # Write your solution here
+    pass
+
+# Test your solution
+if __name__ == "__main__":
+    result = solve()
+    print(result)
+`);
+        }
+
+        // Language selection handler
+        document.getElementById('languageSelect').addEventListener('change', function(e) {
+            const language = e.target.value;
+            const modeMap = {
+                'python': 'ace/mode/python',
+                'java': 'ace/mode/java',
+                'javascript': 'ace/mode/javascript',
+                'c': 'ace/mode/c_cpp',
+                'cpp': 'ace/mode/c_cpp'
+            };
+            editor.getSession().setMode(modeMap[language] || 'ace/mode/python');
+            
+            // Set default template based on language
+            setDefaultTemplate(language);
+        });
+
+        function setDefaultTemplate(language) {
+            const templates = {
+                'python': `def solve():
+    # Write your solution here
+    pass
+
+# Test your solution
+if __name__ == "__main__":
+    result = solve()
+    print(result)
+`,
+                'java': `public class code {
+    public static void main(String[] args) {
+        // Write your solution here
+    }
+}
+`,
+                'javascript': `function solve() {
+    // Write your solution here
+}
+
+// Test your solution
+console.log(solve());
+`,
+                'c': `#include <stdio.h>
+
+int main() {
+    // Write your solution here
+    return 0;
+}
+`,
+                'cpp': `#include <iostream>
+using namespace std;
+
+int main() {
+    // Write your solution here
+    return 0;
+}
+`
+            };
+            editor.setValue(templates[language] || templates['python']);
+        }
+
+        // IO Tab switching
+        function switchIOTab(tab) {
+            document.querySelectorAll('.io-tab').forEach((t, idx) => {
+                t.classList.remove('active');
+                if ((tab === 'input' && idx === 0) || (tab === 'output' && idx === 1)) {
+                    t.classList.add('active');
+                }
+            });
+            document.getElementById('inputContent').classList.toggle('hidden', tab !== 'input');
+            document.getElementById('outputContent').classList.toggle('hidden', tab !== 'output');
+        }
+
+        // Start interview
+        async function startInterview() {
+            try {
+                console.log('[CODING] Starting coding interview...');
+                
+                const response = await fetch(`${API_BASE}/api/interview/coding/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: TEST_USER_ID })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to start interview: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('[CODING] Interview started:', data);
+                
+                currentSessionId = data.session_id;
+                currentQuestion = data.question;
+                currentQuestionNumber = data.question_number || 1;
+                totalQuestions = data.total_questions || 5;
+                interviewActive = true;
+
+                // Update UI
+                updateProgress();
+                displayQuestion(currentQuestion);
+                
+            } catch (error) {
+                console.error('[CODING] Error starting interview:', error);
+                document.getElementById('questionContent').innerHTML = `
+                    <div style="text-align: center; padding: 60px 40px;">
+                        <h3 style="color: #c62828; margin-bottom: 16px;">Error Starting Interview</h3>
+                        <p style="color: #546e7a; margin-bottom: 24px;">${error.message}</p>
+                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Display question
+        function displayQuestion(question) {
+            const content = document.getElementById('questionContent');
+            const difficulty = question.difficulty || 'Medium';
+            const difficultyClass = difficulty.toLowerCase();
+            
+            document.getElementById('difficultyBadge').textContent = difficulty;
+            document.getElementById('difficultyBadge').className = `difficulty-badge ${difficultyClass}`;
+
+            let html = `<h3>Problem Statement</h3><p>${question.problem || 'No problem statement available.'}</p>`;
+
+            if (question.examples && question.examples.length > 0) {
+                html += '<h3>Examples</h3>';
+                question.examples.forEach((example, idx) => {
+                    html += `
+                        <div class="example-box">
+                            <h4>Example ${idx + 1}</h4>
+                            <pre><strong>Input:</strong> ${example.input || 'N/A'}</pre>
+                            <pre><strong>Output:</strong> ${example.output || 'N/A'}</pre>
+                            ${example.explanation ? `<p>${example.explanation}</p>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            if (question.constraints) {
+                html += `
+                    <div class="constraints-box">
+                        <h4>Constraints</h4>
+                        <p>${question.constraints}</p>
+                    </div>
+                `;
+            }
+
+            if (question.topics && question.topics.length > 0) {
+                html += `
+                    <div class="topics-container">
+                        <div class="topics-label">Topics Covered</div>
+                        <div class="topics-tags">
+                            ${question.topics.map(topic => `<span class="topic-tag">${topic}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = html;
+        }
+
+        // Update progress
+        function updateProgress() {
+            const progressText = `Question ${currentQuestionNumber} of ${totalQuestions}`;
+            const progressElement = document.getElementById('progressIndicator');
+            if (progressElement) {
+                progressElement.textContent = progressText;
+                console.log('[CODING] Progress updated:', progressText);
+            }
+        }
+
+        // Run code
+        async function runCode() {
+            const code = editor.getValue();
+            const language = document.getElementById('languageSelect').value;
+            const input = document.getElementById('inputTextarea').value;
+
+            if (!code.trim()) {
+                showToast('Please write some code first!', 'warning');
+                return;
+            }
+
+            const runBtn = document.getElementById('runCodeBtn');
+            const runText = document.getElementById('runCodeText');
+            runBtn.disabled = true;
+            runText.innerHTML = '<span class="loading"></span>Running...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/interview/coding/run`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, language, input })
+                });
+
+                const result = await response.json();
+                
+                // Switch to output tab
+                switchIOTab('output');
+
+                const outputPre = document.getElementById('outputPre');
+                if (result.error) {
+                    outputPre.className = 'error';
+                    outputPre.textContent = `Error: ${result.error}`;
+                } else {
+                    outputPre.className = 'success';
+                    outputPre.textContent = result.output || '(No output)';
+                    if (result.execution_time) {
+                        outputPre.textContent += `\n\nExecution time: ${result.execution_time}s`;
+                    }
+                }
+
+            } catch (error) {
+                console.error('[CODING] Error running code:', error);
+                const outputPre = document.getElementById('outputPre');
+                outputPre.className = 'error';
+                outputPre.textContent = `Error: ${error.message}`;
+            } finally {
+                runBtn.disabled = false;
+                runText.textContent = 'Run Code';
+            }
+        }
+
+        // Submit code
+        async function submitCode() {
+            const code = editor.getValue();
+            
+            if (!code.trim()) {
+                showToast('Please write a solution first!', 'warning');
+                return;
+            }
+
+            const confirmed = await showModal(
+                'Submit Solution',
+                'Are you sure you want to submit this solution? You cannot change it after submission.',
+                'Submit',
+                'Cancel'
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitCodeBtn');
+            const submitText = document.getElementById('submitCodeText');
+            submitBtn.disabled = true;
+            submitText.innerHTML = '<span class="loading"></span>Submitting...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/interview/coding/next`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        previous_question: currentQuestion,
+                        solution: code,
+                        programming_language: document.getElementById('languageSelect').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.interview_completed) {
+                    showToast('Coding interview completed! Loading results...', 'success', 3000);
+                    setTimeout(() => {
+                        // Redirect to results page
+                        window.location.href = `coding-result.html?session_id=${currentSessionId}`;
+                    }, 1500);
+                    return;
+                }
+
+                // Smooth transition: fade out
+                const questionPanel = document.querySelector('.question-panel');
+                questionPanel.classList.add('fade-out');
+                
+                // Move to next question - update state first
+                currentQuestion = data.question;
+                currentQuestionNumber = data.question_number || 1;
+                totalQuestions = data.total_questions || 5;
+
+                // Update UI with smooth transition (no white flash)
+                setTimeout(() => {
+                    updateProgress();
+                    displayQuestion(currentQuestion);
+                    questionPanel.classList.remove('fade-out');
+                    questionPanel.classList.add('fade-in');
+                    
+                    // Reset editor and IO after question is displayed
+                    setDefaultTemplate(document.getElementById('languageSelect').value);
+                    document.getElementById('inputTextarea').value = '';
+                    document.getElementById('outputPre').textContent = 'No output yet. Click "Run Code" to execute your solution.';
+                    document.getElementById('outputPre').className = '';
+                    switchIOTab('input'); // Switch back to input tab
+                }, 200);
+                
+                showToast(`Question ${currentQuestionNumber} loaded!`, 'success', 2000);
+
+            } catch (error) {
+                console.error('[CODING] Error submitting code:', error);
+                showToast(`Error submitting solution: ${error.message}`, 'error', 5000);
+            } finally {
+                submitBtn.disabled = false;
+                submitText.textContent = 'Submit Code';
+            }
+        }
+
+        // End interview
+        async function endInterview() {
+            const confirmed = await showModal(
+                'End Interview',
+                'Are you sure you want to end the interview? Your progress will be saved and you will see your results.',
+                'View Results',
+                'Continue Interview'
+            );
+
+            if (confirmed) {
+                interviewActive = false;
+                // Redirect to results page with current session
+                if (currentSessionId) {
+                    window.location.href = `coding-result.html?session_id=${currentSessionId}`;
+                } else {
+                    window.location.href = 'resume-analysis.html';
+                }
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initEditor();
+            startInterview();
+        });
+    </script>
+</body>
+</html>
+

@@ -46,52 +46,102 @@ async def get_performance_dashboard(
                 resume_summary=None
             )
         
-        # Get all answers for all sessions
+        # Get all answers for all sessions in a single query (optimized: O(1) instead of O(n))
+        # Time Complexity: O(1) - Single query with IN clause
+        # Space Complexity: O(n) where n = total answers
         session_ids = [s["id"] for s in sessions]
         all_answers = []
         
-        for session_id in session_ids:
+        if session_ids:
             try:
-                answers_response = supabase.table("interview_answers").select("*").eq("session_id", session_id).execute()
+                # Batch fetch all answers for all sessions at once
+                # Supabase supports IN queries for better performance
+                answers_response = supabase.table("interview_answers").select("*").in_("session_id", session_ids).execute()
                 if answers_response.data:
-                    all_answers.extend(answers_response.data)
+                    all_answers = answers_response.data
             except Exception as db_err:
-                print(f"[WARNING] Failed to fetch answers for session {session_id}: {str(db_err)}")
-                continue
+                print(f"[WARNING] Failed to batch fetch answers: {str(db_err)}")
+                # Fallback to individual queries only if batch fails
+                for session_id in session_ids:
+                    try:
+                        answers_response = supabase.table("interview_answers").select("*").eq("session_id", session_id).execute()
+                        if answers_response.data:
+                            all_answers.extend(answers_response.data)
+                    except Exception:
+                        continue
+        
+        # Create answer lookup dictionary for O(1) access instead of O(n) filtering
+        # Time Complexity: O(n) to build, O(1) to access
+        # Space Complexity: O(n)
+        answers_by_session = {}
+        for answer in all_answers:
+            session_id = answer.get("session_id")
+            if session_id:
+                if session_id not in answers_by_session:
+                    answers_by_session[session_id] = []
+                answers_by_session[session_id].append(answer)
+        
+        # Batch fetch question counts for all sessions (optimized: O(1) instead of O(n))
+        # Time Complexity: O(1) - Single query with IN clause
+        # Space Complexity: O(n) where n = number of sessions
+        question_counts = {}
+        if session_ids:
+            try:
+                questions_response = supabase.table("interview_questions").select("session_id,id").in_("session_id", session_ids).execute()
+                if questions_response.data:
+                    # Count questions per session
+                    for q in questions_response.data:
+                        sid = q.get("session_id")
+                        if sid:
+                            question_counts[sid] = question_counts.get(sid, 0) + 1
+            except Exception:
+                # Fallback: use answer counts as approximation
+                for sid in session_ids:
+                    question_counts[sid] = len(answers_by_session.get(sid, []))
         
         # Calculate average score
+        # Time Complexity: O(n) where n = number of recent sessions (max 10)
+        # Space Complexity: O(1) - only storing aggregates
         total_score = 0
         score_count = 0
         recent_interviews_list = []
         
         for session in sessions[:10]:  # Get last 10 interviews
-            # Get answers for this session
-            session_answers = [a for a in all_answers if a["session_id"] == session["id"]]
+            session_id = session["id"]
+            # Use dictionary lookup instead of filtering (O(1) vs O(n))
+            session_answers = answers_by_session.get(session_id, [])
             
             if session_answers:
-                # Calculate average score for this session
-                session_scores = [a.get("overall_score", 0) for a in session_answers if a.get("overall_score")]
-                if session_scores:
-                    session_avg = sum(session_scores) / len(session_scores)
+                # Optimize score calculation: single pass instead of list comprehension + sum
+                # Time Complexity: O(m) where m = answers per session
+                # Space Complexity: O(1) - calculating sum directly
+                score_sum = 0
+                score_count_session = 0
+                latest_answered_at = None
+                
+                for answer in session_answers:
+                    score = answer.get("overall_score")
+                    if score:
+                        score_sum += score
+                        score_count_session += 1
+                    # Track latest answer time in same loop
+                    answered_at = answer.get("answered_at")
+                    if answered_at and (not latest_answered_at or answered_at > latest_answered_at):
+                        latest_answered_at = answered_at
+                
+                if score_count_session > 0:
+                    session_avg = score_sum / score_count_session
                     total_score += session_avg
                     score_count += 1
                     
                     # Get completion time (use latest answer time or session updated_at)
-                    completed_at = session.get("updated_at") or session.get("created_at")
-                    if session_answers:
-                        latest_answer = max(session_answers, key=lambda x: x.get("answered_at", ""))
-                        if latest_answer.get("answered_at"):
-                            completed_at = latest_answer["answered_at"]
+                    completed_at = latest_answered_at or session.get("updated_at") or session.get("created_at")
                     
-                    # Get question counts
-                    try:
-                        questions_response = supabase.table("interview_questions").select("id", count="exact").eq("session_id", session["id"]).execute()
-                        total_questions = questions_response.count if hasattr(questions_response, 'count') else len(session_answers)
-                    except Exception:
-                        total_questions = len(session_answers)
+                    # Get question count from pre-fetched dictionary
+                    total_questions = question_counts.get(session_id, len(session_answers))
                     
                     recent_interviews_list.append(InterviewSummary(
-                        session_id=session["id"],
+                        session_id=session_id,
                         role=session.get("role", "Unknown"),
                         experience_level=session.get("experience_level", "Unknown"),
                         overall_score=round(session_avg, 2),
@@ -103,19 +153,11 @@ async def get_performance_dashboard(
         
         average_score = total_score / score_count if score_count > 0 else 0.0
         
-        # Calculate completion rate
-        total_questions_all = 0
-        answered_questions_all = 0
-        for session in sessions:
-            try:
-                questions_response = supabase.table("interview_questions").select("id", count="exact").eq("session_id", session["id"]).execute()
-                total_q = questions_response.count if hasattr(questions_response, 'count') else 0
-                total_questions_all += total_q
-                
-                session_answers = [a for a in all_answers if a["session_id"] == session["id"]]
-                answered_questions_all += len(session_answers)
-            except Exception:
-                continue
+        # Calculate completion rate using pre-fetched data
+        # Time Complexity: O(n) where n = number of sessions
+        # Space Complexity: O(1)
+        total_questions_all = sum(question_counts.get(s["id"], 0) for s in sessions)
+        answered_questions_all = sum(len(answers_by_session.get(s["id"], [])) for s in sessions)
         
         completion_rate = (answered_questions_all / total_questions_all * 100) if total_questions_all > 0 else 0.0
         
@@ -184,7 +226,34 @@ async def get_trends_dashboard(
                 score_progression={}
             )
         
-        # Get all answers grouped by session
+        # Batch fetch all answers for all sessions (optimized: O(1) instead of O(n))
+        # Time Complexity: O(1) - Single query with IN clause
+        # Space Complexity: O(n) where n = total answers
+        session_ids = [s["id"] for s in sessions]
+        all_answers_trends = []
+        
+        if session_ids:
+            try:
+                answers_response = supabase.table("interview_answers").select("*").in_("session_id", session_ids).execute()
+                if answers_response.data:
+                    all_answers_trends = answers_response.data
+            except Exception as db_err:
+                print(f"[WARNING] Failed to batch fetch answers for trends: {str(db_err)}")
+        
+        # Create answer lookup dictionary for O(1) access
+        # Time Complexity: O(n) to build, O(1) to access
+        # Space Complexity: O(n)
+        answers_by_session_trends = {}
+        for answer in all_answers_trends:
+            session_id = answer.get("session_id")
+            if session_id:
+                if session_id not in answers_by_session_trends:
+                    answers_by_session_trends[session_id] = []
+                answers_by_session_trends[session_id].append(answer)
+        
+        # Process trends data
+        # Time Complexity: O(n*m) where n = sessions, m = avg answers per session
+        # Space Complexity: O(n)
         trend_data = []
         score_progression = {
             "clarity": [],
@@ -194,64 +263,96 @@ async def get_trends_dashboard(
         }
         
         for session in sessions:
-            try:
-                answers_response = supabase.table("interview_answers").select("*").eq("session_id", session["id"]).execute()
-            except Exception as db_err:
-                print(f"[WARNING] Failed to fetch answers for session {session['id']}: {str(db_err)}")
-                continue
+            session_id = session["id"]
+            answers = answers_by_session_trends.get(session_id, [])
             
-            if answers_response.data and len(answers_response.data) > 0:
-                answers = answers_response.data
+            if answers:
+                # Optimize: single pass through answers to calculate all metrics
+                # Time Complexity: O(m) where m = answers per session
+                # Space Complexity: O(1) - calculating sums directly
+                score_sum = 0
+                score_count = 0
+                clarity_sum = 0
+                clarity_count = 0
+                accuracy_sum = 0
+                accuracy_count = 0
+                confidence_sum = 0
+                confidence_count = 0
+                communication_sum = 0
+                communication_count = 0
+                latest_answered_at = None
                 
-                # Calculate average score for this session
-                session_scores = [a.get("overall_score", 0) for a in answers if a.get("overall_score")]
-                if session_scores:
-                    avg_score = sum(session_scores) / len(session_scores)
+                for answer in answers:
+                    # Overall score
+                    overall = answer.get("overall_score")
+                    if overall:
+                        score_sum += overall
+                        score_count += 1
+                    
+                    # Category scores
+                    relevance = answer.get("relevance_score")
+                    if relevance:
+                        clarity_sum += relevance
+                        clarity_count += 1
+                    
+                    technical = answer.get("technical_accuracy_score")
+                    if technical:
+                        accuracy_sum += technical
+                        accuracy_count += 1
+                    
+                    confidence = answer.get("confidence_score")
+                    if confidence:
+                        confidence_sum += confidence
+                        confidence_count += 1
+                    
+                    comm = answer.get("communication_score")
+                    if comm:
+                        communication_sum += comm
+                        communication_count += 1
+                    
+                    # Track latest answer time
+                    answered_at = answer.get("answered_at")
+                    if answered_at and (not latest_answered_at or answered_at > latest_answered_at):
+                        latest_answered_at = answered_at
+                
+                if score_count > 0:
+                    avg_score = score_sum / score_count
                     
                     # Get date
-                    completed_at = session.get("updated_at") or session.get("created_at")
-                    if answers:
-                        latest_answer = max(answers, key=lambda x: x.get("answered_at", ""))
-                        if latest_answer.get("answered_at"):
-                            completed_at = latest_answer["answered_at"]
+                    completed_at = latest_answered_at or session.get("updated_at") or session.get("created_at")
                     
-                    # Format date
+                    # Format date (optimized: single operation)
                     if isinstance(completed_at, str):
-                        date_str = completed_at.split('T')[0]  # Get YYYY-MM-DD
+                        date_str = completed_at[:10] if len(completed_at) >= 10 else completed_at.split('T')[0]
                     else:
                         date_str = completed_at.strftime('%Y-%m-%d')
                     
                     trend_data.append(TrendDataPoint(
                         date=date_str,
                         score=round(avg_score, 2),
-                        session_id=session["id"]
+                        session_id=session_id
                     ))
                     
-                    # Calculate category averages for this session
-                    clarity_scores = [a.get("relevance_score", 0) for a in answers]
-                    accuracy_scores = [a.get("technical_accuracy_score", 0) for a in answers]
-                    confidence_scores = [a.get("confidence_score", 0) for a in answers]
-                    communication_scores = [a.get("communication_score", 0) for a in answers]
-                    
-                    if clarity_scores:
+                    # Add category averages
+                    if clarity_count > 0:
                         score_progression["clarity"].append({
                             "date": date_str,
-                            "score": sum(clarity_scores) / len(clarity_scores)
+                            "score": round(clarity_sum / clarity_count, 2)
                         })
-                    if accuracy_scores:
+                    if accuracy_count > 0:
                         score_progression["accuracy"].append({
                             "date": date_str,
-                            "score": sum(accuracy_scores) / len(accuracy_scores)
+                            "score": round(accuracy_sum / accuracy_count, 2)
                         })
-                    if confidence_scores:
+                    if confidence_count > 0:
                         score_progression["confidence"].append({
                             "date": date_str,
-                            "score": sum(confidence_scores) / len(confidence_scores)
+                            "score": round(confidence_sum / confidence_count, 2)
                         })
-                    if communication_scores:
+                    if communication_count > 0:
                         score_progression["communication"].append({
                             "date": date_str,
-                            "score": sum(communication_scores) / len(communication_scores)
+                            "score": round(communication_sum / communication_count, 2)
                         })
         
         return TrendsDashboardResponse(
@@ -274,39 +375,69 @@ async def get_trends_dashboard(
         raise HTTPException(status_code=500, detail=f"Error fetching trends dashboard: {str(e)}")
 
 def analyze_skills(all_answers: List[Dict], sessions: List[Dict]) -> SkillAnalysis:
-    """Analyze skills from interview answers to identify strengths and weaknesses"""
-    
+    """
+    Analyze skills from interview answers to identify strengths and weaknesses
+    Time Complexity: O(n) where n = number of answers (single pass)
+    Space Complexity: O(k) where k = number of unique question types
+    Optimization: Single pass through answers, calculating sums and counts directly
+    """
     if not all_answers:
         return SkillAnalysis(strong_skills=[], weak_areas=[])
     
-    # Analyze by question type and scores
-    type_scores = {}
+    # Analyze by question type and scores in a single pass
+    # Use dictionaries to store sum and count for O(1) updates
+    # Time Complexity: O(n) - single pass
+    # Space Complexity: O(k) where k = unique question types
+    type_sums = {}
+    type_counts = {}
+    
     for answer in all_answers:
         q_type = answer.get("question_type", "Unknown")
         score = answer.get("overall_score", 0)
         
-        if q_type not in type_scores:
-            type_scores[q_type] = []
-        type_scores[q_type].append(score)
+        if score > 0:  # Only count non-zero scores
+            if q_type not in type_sums:
+                type_sums[q_type] = 0
+                type_counts[q_type] = 0
+            type_sums[q_type] += score
+            type_counts[q_type] += 1
     
     # Calculate averages by type
-    type_averages = {}
-    for q_type, scores in type_scores.items():
-        if scores:
-            type_averages[q_type] = sum(scores) / len(scores)
+    # Time Complexity: O(k) where k = unique question types
+    # Space Complexity: O(k)
+    type_averages = {
+        q_type: type_sums[q_type] / type_counts[q_type]
+        for q_type in type_sums
+        if type_counts[q_type] > 0
+    }
+    
+    if not type_averages:
+        # Fallback to generic categories if no data
+        return SkillAnalysis(
+            strong_skills=["Technical Knowledge", "Problem Solving", "Communication"],
+            weak_areas=["Time Management", "Answer Structure", "Technical Depth"]
+        )
     
     # Identify strong and weak areas
+    # Time Complexity: O(k log k) for sorting
+    # Space Complexity: O(k)
     sorted_types = sorted(type_averages.items(), key=lambda x: x[1], reverse=True)
     
-    strong_skills = [t[0] for t in sorted_types[:3] if t[1] >= 70]
-    weak_areas = [t[0] for t in sorted_types[-3:] if t[1] < 70]
+    # Extract strong skills and weak areas in single pass
+    # Time Complexity: O(k)
+    # Space Complexity: O(1) - max 3 items
+    strong_skills = [t[0] for t in sorted_types if t[1] >= 70][:3]
+    weak_areas = [t[0] for t in reversed(sorted_types) if t[1] < 70][:3]
     
     # If we don't have enough, use generic categories
+    generic_strong = ["Technical Knowledge", "Problem Solving", "Communication"]
+    generic_weak = ["Time Management", "Answer Structure", "Technical Depth"]
+    
     if len(strong_skills) < 3:
-        strong_skills.extend(["Technical Knowledge", "Problem Solving", "Communication"][:3-len(strong_skills)])
+        strong_skills.extend([s for s in generic_strong if s not in strong_skills][:3-len(strong_skills)])
     
     if len(weak_areas) < 3:
-        weak_areas.extend(["Time Management", "Answer Structure", "Technical Depth"][:3-len(weak_areas)])
+        weak_areas.extend([w for w in generic_weak if w not in weak_areas][:3-len(weak_areas)])
     
     return SkillAnalysis(
         strong_skills=strong_skills[:3],

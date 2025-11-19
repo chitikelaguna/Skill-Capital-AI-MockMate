@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Interview Results - Skill Capital AI MockMate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .results-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .results-header {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .results-header h1 {
+            color: #1a237e;
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 16px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #546e7a;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .question-result {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e8eaf6;
+        }
+
+        .question-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #283593;
+        }
+
+        .correctness-badge {
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .correctness-badge.correct {
+            background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+            color: #1b5e20;
+        }
+
+        .correctness-badge.incorrect {
+            background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
+            color: #b71c1c;
+        }
+
+        .code-section {
+            margin: 24px 0;
+        }
+
+        .code-section h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #37474f;
+            margin-bottom: 12px;
+        }
+
+        .code-block {
+            background: #f5f5f5;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .feedback-section {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border-left: 5px solid #ff9800;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 24px 0;
+        }
+
+        .feedback-section h3 {
+            color: #e65100;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .feedback-section p {
+            color: #37474f;
+            line-height: 1.8;
+            margin: 8px 0;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(33, 150, 243, 0.4);
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 60px 40px;
+            background: #ffffff;
+            border-radius: 16px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(33, 150, 243, 0.3);
+            border-top-color: #2196f3;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .results-container {
+                padding: 16px;
+            }
+
+            .question-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="results-container">
+        <div id="loadingState" class="loading-state">
+            <div class="loading"></div>
+            <p style="color: #546e7a; font-size: 16px;">Loading your coding interview results...</p>
+        </div>
+
+        <div id="resultsContent" style="display: none;">
+            <div class="results-header">
+                <h1>📊 Coding Interview Results</h1>
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+
+            <div id="questionsContainer"></div>
+
+            <div class="action-buttons">
+                <a href="resume-analysis.html" class="btn btn-primary">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        
+        // Get session_id from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+
+        async function loadResults() {
+            if (!sessionId) {
+                document.getElementById('loadingState').innerHTML = `
+                    <h2 style="color: #c62828;">Error</h2>
+                    <p>No session ID provided. Please complete a coding interview first.</p>
+                    <a href="resume-analysis.html" class="btn btn-primary" style="margin-top: 20px;">Go to Dashboard</a>
+                `;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/interview/coding/${sessionId}/results`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load results: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Hide loading, show results
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('resultsContent').style.display = 'block';
+
+                // Display statistics
+                displayStatistics(data.statistics);
+                
+                // Display questions
+                displayQuestions(data.results);
+
+            } catch (error) {
+                console.error('Error loading results:', error);
+                document.getElementById('loadingState').innerHTML = `
+                    <h2 style="color: #c62828;">Error Loading Results</h2>
+                    <p>${error.message}</p>
+                    <a href="resume-analysis.html" class="btn btn-primary" style="margin-top: 20px;">Go to Dashboard</a>
+                `;
+            }
+        }
+
+        function displayStatistics(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.total_questions}</div>
+                    <div class="stat-label">Total Questions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #2e7d32;">${stats.correct_answers}</div>
+                    <div class="stat-label">Correct</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #c62828;">${stats.incorrect_answers}</div>
+                    <div class="stat-label">Incorrect</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #1976d2;">${stats.accuracy}%</div>
+                    <div class="stat-label">Accuracy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #f57f17;">${stats.average_score}/100</div>
+                    <div class="stat-label">Average Score</div>
+                </div>
+            `;
+        }
+
+        function displayQuestions(results) {
+            const container = document.getElementById('questionsContainer');
+            
+            if (!results || results.length === 0) {
+                container.innerHTML = '<div class="question-result"><p>No results available yet.</p></div>';
+                return;
+            }
+
+            container.innerHTML = results.map((result, index) => {
+                const isCorrect = result.correctness;
+                const score = result.final_score || 0;
+                const difficulty = result.difficulty_level || 'Medium';
+                const language = result.programming_language || 'python';
+
+                return `
+                    <div class="question-result">
+                        <div class="question-header">
+                            <div>
+                                <div class="question-title">Question ${result.question_number}</div>
+                                <div style="margin-top: 8px; color: #546e7a; font-size: 14px;">
+                                    Difficulty: ${difficulty} | Language: ${language.toUpperCase()} | Score: ${score}/100
+                                </div>
+                            </div>
+                            <span class="correctness-badge ${isCorrect ? 'correct' : 'incorrect'}">
+                                ${isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                            </span>
+                        </div>
+
+                        <div class="code-section">
+                            <h3>Problem Statement</h3>
+                            <div class="code-block" style="background: #e3f2fd; white-space: pre-wrap;">${escapeHtml(result.question_text || 'No question text available')}</div>
+                        </div>
+
+                        <div class="code-section">
+                            <h3>Your Solution</h3>
+                            <div class="code-block">${escapeHtml(result.user_code || 'No code submitted')}</div>
+                        </div>
+
+                        ${result.execution_output ? `
+                            <div class="code-section">
+                                <h3>Execution Output</h3>
+                                <div class="code-block" style="background: ${isCorrect ? '#e8f5e9' : '#ffebee'};">
+                                    ${escapeHtml(result.execution_output)}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${result.correct_solution ? `
+                            <div class="code-section">
+                                <h3>Correct Solution</h3>
+                                <div class="code-block" style="background: #e8f5e9;">${escapeHtml(result.correct_solution)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${result.ai_feedback ? `
+                            <div class="feedback-section">
+                                <h3>📝 AI Feedback & Analysis</h3>
+                                <div style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(result.ai_feedback)}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load results on page load
+        document.addEventListener('DOMContentLoaded', loadResults);
+    </script>
+</body>
+</html>
+

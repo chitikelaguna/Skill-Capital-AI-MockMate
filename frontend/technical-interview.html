@@ -266,6 +266,98 @@
             margin: 15px 0;
             border-left: 4px solid #c62828;
         }
+
+        /* Interview Guidelines Section */
+        .guidelines-section {
+            background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+            border-radius: 16px;
+            padding: 28px;
+            margin: 30px 0;
+            border: 1.5px solid var(--border-light);
+            box-shadow: 0 2px 12px var(--shadow-sm);
+        }
+
+        .guidelines-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .guidelines-header h3 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+
+        .guidelines-header-icon {
+            font-size: 28px;
+        }
+
+        .guideline-category {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 1px 4px var(--shadow-sm);
+            transition: all 0.3s ease;
+        }
+
+        .guideline-category:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px var(--shadow-md);
+        }
+
+        .guideline-category-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .guideline-category-header h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 0;
+            letter-spacing: -0.2px;
+        }
+
+        .guideline-category-icon {
+            font-size: 20px;
+        }
+
+        .guideline-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .guideline-list li {
+            padding: 10px 0 10px 28px;
+            color: var(--text-primary);
+            line-height: 1.7;
+            position: relative;
+            font-size: 15px;
+        }
+
+        .guideline-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .guideline-list li:not(:last-child) {
+            border-bottom: 1px solid var(--border-light);
+        }
     </style>
 </head>
 <body>
@@ -296,8 +388,93 @@
                         This interview will use your resume skills to generate personalized technical questions.
                         You'll answer using your voice, and the AI will evaluate your responses in real-time.
                     </p>
+
+                    <!-- Interview Guidelines Section -->
+                    <div class="guidelines-section">
+                        <div class="guidelines-header">
+                            <span class="guidelines-header-icon">🧠</span>
+                            <h3>Interview Guidelines</h3>
+                        </div>
+
+                        <!-- Technical Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Technical Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Technical guidelines are according to resume only.</li>
+                                <li>Be ready to explain your core technical skills (<span id="resumeSkillsList">Loading skills...</span>).</li>
+                                <li>Expect questions about algorithms, debugging, system design, and end-to-end project explanation.</li>
+                                <li>Interviewer may ask you to walk through your previous projects, architecture, and your contribution.</li>
+                                <li>Be prepared to talk about real-world use cases, model training approach, libraries used, limitations, and optimizations.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Professional Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Professional Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Communicate clearly and concisely.</li>
+                                <li>Think aloud while solving any technical question.</li>
+                                <li>Do not jump directly to an answer — explain your reasoning.</li>
+                                <li>Maintain confidence, avoid filler words, and speak at a normal pace.</li>
+                                <li>If you don't know something, acknowledge it and give your best attempt logically.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Discipline & Behavioral Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Discipline & Behavioral Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Maintain proper tone, politeness, and professionalism.</li>
+                                <li>Listen fully before answering — avoid interrupting the interviewer.</li>
+                                <li>Keep answers structured: problem → approach → example → conclusion.</li>
+                                <li>Follow the interviewer's instructions and stay calm under pressure.</li>
+                                <li>Demonstrate curiosity, ownership, and accountability for your work.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Voice Interview Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Voice Interview Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Speak clearly and hold your microphone close.</li>
+                                <li>Answer naturally, like a real interview conversation.</li>
+                                <li>Pause for a moment after the interviewer stops speaking.</li>
+                                <li>The AI will analyze clarity, confidence, technical depth, and communication quality.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Evaluation Criteria -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Evaluation Criteria</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Technical correctness</li>
+                                <li>Problem-solving approach</li>
+                                <li>Depth of knowledge in your resume skills</li>
+                                <li>Communication & confidence</li>
+                                <li>Project understanding</li>
+                                <li>Real-world thinking</li>
+                                <li>Professionalism and discipline</li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <div class="interview-actions">
-                        <button class="btn btn-primary" id="startInterviewBtn">Start Interview</button>
+                        <button class="btn btn-primary" id="startInterviewBtn" onclick="window.location.href='interview.html'">Start Interview</button>
                         <button class="btn btn-secondary" onclick="window.location.href='index.html'">Back to Dashboard</button>
                     </div>
                 </div>
@@ -370,6 +547,86 @@
     </div>
 
     <script src="technical-interview.js"></script>
+    <script>
+        /**
+         * Load and display resume skills in Technical Guidelines section
+         */
+        async function loadResumeSkills() {
+            const skillsListElement = document.getElementById('resumeSkillsList');
+            if (!skillsListElement) return;
+
+            let skills = [];
+
+            // Try to get skills from sessionStorage first (faster)
+            const cachedData = sessionStorage.getItem('resume_analysis_data');
+            if (cachedData) {
+                try {
+                    const data = JSON.parse(cachedData);
+                    if (data.skills && Array.isArray(data.skills) && data.skills.length > 0) {
+                        skills = data.skills;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse cached resume data:', e);
+                }
+            }
+
+            // If no skills from sessionStorage, try to fetch from backend
+            if (skills.length === 0) {
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const sessionId = urlParams.get('session') || sessionStorage.getItem('resume_analysis_session');
+                    
+                    if (sessionId && sessionId !== 'new') {
+                        const API_BASE = 'http://127.0.0.1:8000';
+                        const res = await fetch(`${API_BASE}/api/profile/resume-analysis/${sessionId}`);
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.skills && Array.isArray(data.skills) && data.skills.length > 0) {
+                                skills = data.skills;
+                                // Cache it for future use
+                                sessionStorage.setItem('resume_analysis_data', JSON.stringify(data));
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch skills from backend:', e);
+                }
+            }
+
+            // If still no skills, try to get from user profile
+            if (skills.length === 0) {
+                try {
+                    const userId = window.TEST_USER_ID || 'test_user_001';
+                    const API_BASE = 'http://127.0.0.1:8000';
+                    const res = await fetch(`${API_BASE}/api/profile/${userId}`);
+                    
+                    if (res.ok) {
+                        const profile = await res.json();
+                        if (profile.skills && Array.isArray(profile.skills) && profile.skills.length > 0) {
+                            skills = profile.skills;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch skills from profile:', e);
+                }
+            }
+
+            // Format and display skills
+            if (skills.length > 0) {
+                // Format as comma-separated list: "Python, Java, SQL, HTML..."
+                const skillsText = skills.join(', ');
+                skillsListElement.textContent = skillsText;
+            } else {
+                skillsListElement.textContent = 'No technical skills detected from resume.';
+            }
+        }
+
+        // Load skills when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            loadResumeSkills();
+        });
+    </script>
 </body>
 </html>
 
