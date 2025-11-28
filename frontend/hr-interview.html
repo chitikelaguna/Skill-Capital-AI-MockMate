@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Interview - Skill Capital AI MockMate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .interview-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .interview-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .interview-header h1 {
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        .interview-status {
+            display: inline-block;
+            padding: 8px 16px;
+            background: var(--accent-light);
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        .interview-status.active {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .interview-status.completed {
+            background: #bbdefb;
+            color: #1565c0;
+        }
+
+        .voice-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .voice-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            font-size: 48px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(142, 197, 252, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .voice-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(142, 197, 252, 0.6);
+        }
+
+        .voice-button.recording {
+            background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-button.listening {
+            background: linear-gradient(135deg, #66bb6a 0%, #2e7d32 100%);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .voice-status {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .conversation-container {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 500px;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px var(--shadow-sm);
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.ai {
+            background: var(--accent-light);
+            border-left: 4px solid var(--primary);
+        }
+
+        .message.user {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            margin-left: auto;
+            max-width: 80%;
+        }
+
+        .message-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .message-content {
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .audio-player {
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .interview-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-light);
+        }
+
+        .btn-danger {
+            background: #ef5350;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c62828;
+        }
+
+        .feedback-section {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 30px;
+            box-shadow: 0 2px 8px var(--shadow-sm);
+        }
+
+        .feedback-section h2 {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .score-display {
+            text-align: center;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .score-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin: 10px 0;
+        }
+
+        .feedback-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .feedback-item h3 {
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .feedback-item ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .feedback-item li {
+            padding: 5px 0;
+            color: var(--text-primary);
+        }
+
+        .feedback-item li:before {
+            content: "• ";
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-light);
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #c62828;
+        }
+
+        /* Interview Guidelines Section */
+        .guidelines-section {
+            background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+            border-radius: 16px;
+            padding: 28px;
+            margin: 30px 0;
+            border: 1.5px solid var(--border-light);
+            box-shadow: 0 2px 12px var(--shadow-sm);
+        }
+
+        .guidelines-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .guidelines-header h3 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+
+        .guidelines-header-icon {
+            font-size: 28px;
+        }
+
+        .guideline-category {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 1px 4px var(--shadow-sm);
+            transition: all 0.3s ease;
+        }
+
+        .guideline-category:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px var(--shadow-md);
+        }
+
+        .guideline-category-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .guideline-category-header h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 0;
+            letter-spacing: -0.2px;
+        }
+
+        .guideline-category-icon {
+            font-size: 20px;
+        }
+
+        .guideline-list {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .guideline-list li {
+            padding: 10px 0 10px 28px;
+            color: var(--text-primary);
+            line-height: 1.7;
+            position: relative;
+            font-size: 15px;
+        }
+
+        .guideline-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .guideline-list li:not(:last-child) {
+            border-bottom: 1px solid var(--border-light);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <img src="logo.png" alt="Skill Capital AI MockMate Logo" class="header-logo">
+                <div class="header-text">
+                    <h1>HR Interview</h1>
+                    <p class="subtitle">AI-Powered Voice Interview Experience</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="interview-container">
+                <!-- Interview Status -->
+                <div class="interview-header">
+                    <div class="interview-status" id="interviewStatus">Ready to Start</div>
+                </div>
+
+                <!-- Pre-Interview Setup (Hidden after start) -->
+                <div id="setupSection" class="card">
+                    <h2>Start HR Interview</h2>
+                    <p style="color: var(--text-light); margin-bottom: 20px;">
+                        This interview will focus on your communication skills, leadership abilities, and cultural fit.
+                        You'll answer using your voice, and the AI will evaluate your responses in real-time.
+                    </p>
+
+                    <!-- Interview Guidelines Section -->
+                    <div class="guidelines-section">
+                        <div class="guidelines-header">
+                            <span class="guidelines-header-icon">👔</span>
+                            <h3>HR Interview Guidelines</h3>
+                        </div>
+
+                        <!-- Communication Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Communication Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Speak clearly and confidently with a professional tone.</li>
+                                <li>Use structured answers: Situation → Action → Result format when appropriate.</li>
+                                <li>Be concise but thorough - avoid rambling or overly brief responses.</li>
+                                <li>Show enthusiasm and genuine interest in the role and company.</li>
+                                <li>Listen carefully to questions and ask for clarification if needed.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Leadership & Teamwork Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Leadership & Teamwork Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Provide specific examples from your past experiences.</li>
+                                <li>Highlight your ability to work in teams and collaborate effectively.</li>
+                                <li>Demonstrate leadership qualities through concrete achievements.</li>
+                                <li>Show how you handle conflicts and difficult situations.</li>
+                                <li>Emphasize your adaptability and willingness to learn.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Professional Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Professional Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Maintain a positive and professional demeanor throughout.</li>
+                                <li>Be honest and authentic - don't exaggerate or fabricate experiences.</li>
+                                <li>Show cultural awareness and respect for diversity.</li>
+                                <li>Demonstrate your understanding of the company's values and mission.</li>
+                                <li>Express your career goals and how they align with the role.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Voice Interview Guidelines -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Voice Interview Guidelines</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Speak clearly and hold your microphone close for best audio quality.</li>
+                                <li>Answer naturally, as if having a conversation with a real HR interviewer.</li>
+                                <li>Pause briefly after the interviewer finishes speaking before responding.</li>
+                                <li>The AI will analyze your communication clarity, confidence, and professionalism.</li>
+                                <li>Take a moment to think before answering complex questions.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Evaluation Criteria -->
+                        <div class="guideline-category">
+                            <div class="guideline-category-header">
+                                <span class="guideline-category-icon">→</span>
+                                <h4>Evaluation Criteria</h4>
+                            </div>
+                            <ul class="guideline-list">
+                                <li>Communication skills and clarity</li>
+                                <li>Leadership and teamwork abilities</li>
+                                <li>Professionalism and cultural fit</li>
+                                <li>Problem-solving and conflict resolution</li>
+                                <li>Career motivation and alignment</li>
+                                <li>Confidence and authenticity</li>
+                                <li>Overall interview presence</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="interview-actions">
+                        <button class="btn btn-primary" id="startInterviewBtn">Start Interview</button>
+                        <button class="btn btn-secondary" onclick="window.location.href='index.html'">Back to Dashboard</button>
+                    </div>
+                </div>
+
+                <!-- Interview Interface (Hidden until start) -->
+                <div id="interviewSection" class="hidden">
+                    <!-- Conversation Display -->
+                    <div class="conversation-container" id="conversationContainer">
+                        <div class="loading" id="loadingMessage">Initializing interview...</div>
+                    </div>
+
+                    <!-- Voice Controls -->
+                    <div class="voice-controls">
+                        <button class="voice-button" id="voiceButton" title="Click to record your answer">
+                            🎤
+                        </button>
+                        <div class="voice-status" id="voiceStatus">Click the microphone to start recording</div>
+                    </div>
+
+                    <!-- Interview Actions -->
+                    <div class="interview-actions">
+                        <button class="btn btn-danger" id="endInterviewBtn">End Interview</button>
+                    </div>
+                </div>
+
+                <!-- Feedback Section (Hidden until interview ends) -->
+                <div id="feedbackSection" class="feedback-section hidden">
+                    <h2>Interview Feedback</h2>
+                    <div class="loading" id="feedbackLoading">Generating feedback...</div>
+                    <div id="feedbackContent" class="hidden">
+                        <div class="score-display">
+                            <div style="font-size: 18px; color: var(--text-light);">Overall Score</div>
+                            <div class="score-value" id="overallScore">0</div>
+                            <div style="font-size: 14px; color: var(--text-light);">out of 100</div>
+                        </div>
+
+                        <div class="feedback-item">
+                            <h3>✨ Strengths</h3>
+                            <ul id="strengthsList"></ul>
+                        </div>
+
+                        <div class="feedback-item">
+                            <h3>📈 Areas for Improvement</h3>
+                            <ul id="improvementsList"></ul>
+                        </div>
+
+                        <div class="feedback-item">
+                            <h3>💡 Recommendations</h3>
+                            <ul id="recommendationsList"></ul>
+                        </div>
+
+                        <div class="feedback-item">
+                            <h3>📝 Summary</h3>
+                            <p id="feedbackSummary" style="color: var(--text-primary); line-height: 1.6;"></p>
+                        </div>
+
+                        <div class="interview-actions" style="margin-top: 30px;">
+                            <button class="btn btn-primary" onclick="window.location.href='index.html'">Back to Dashboard</button>
+                            <button class="btn btn-secondary" id="restartInterviewBtn">Start New Interview</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Skill Capital AI MockMate</p>
+        </footer>
+    </div>
+
+    <!-- Load API configuration first -->
+    <script src="api-config.js"></script>
+    <script src="hr-interview.js"></script>
+    <!-- TEMPORARY: Voice test file for debugging -->
+    <script src="hr_interview_voice_test.js"></script>
+</body>
+</html>
+

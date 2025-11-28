@@ -644,22 +644,50 @@
             return insights.map(insight => `<div style="margin-bottom: 8px;">${insight}</div>`).join('');
         }
 
+        // Make function globally accessible - define it early to ensure it's available
         function startInterviewFromModule(moduleType) {
-            // Store the module type in sessionStorage for reference
-            sessionStorage.setItem('selectedInterviewModule', moduleType);
+            console.log('[NAVIGATION] startInterviewFromModule called with moduleType:', moduleType, 'type:', typeof moduleType);
             
-            // Redirect to appropriate interview page
-            if (moduleType === 'technical') {
-                // Redirect to technical interview page
-                window.location.href = 'technical-interview.html';
-            } else if (moduleType === 'coding') {
-                // Redirect to coding interview page
-                window.location.href = 'coding-interview.html';
-            } else {
-                // For other modules, redirect to main page
-                window.location.href = '/';
+            // Normalize module type (trim and lowercase for safety)
+            const normalizedType = String(moduleType || '').trim().toLowerCase();
+            console.log('[NAVIGATION] Normalized type:', normalizedType);
+            
+            // Store the module type in sessionStorage for reference
+            sessionStorage.setItem('selectedInterviewModule', normalizedType);
+            
+            // Redirect to appropriate interview page using switch for better reliability
+            let targetUrl = null;
+            
+            switch(normalizedType) {
+                case 'technical':
+                    targetUrl = 'technical-interview.html';
+                    console.log('[NAVIGATION] Redirecting to technical-interview.html');
+                    break;
+                case 'coding':
+                    targetUrl = 'coding-interview.html';
+                    console.log('[NAVIGATION] Redirecting to coding-interview.html');
+                    break;
+                case 'hr':
+                    targetUrl = 'hr-interview.html';
+                    console.log('[NAVIGATION] Redirecting to hr-interview.html');
+                    break;
+                default:
+                    targetUrl = 'index.html';
+                    console.log('[NAVIGATION] Unknown module type:', normalizedType, '- redirecting to dashboard');
+                    break;
             }
+            
+            // Perform navigation
+            if (targetUrl) {
+                console.log('[NAVIGATION] Navigating to:', targetUrl);
+                window.location.href = targetUrl;
+            }
+            
+            return false; // Prevent default behavior
         }
+        
+        // Also attach to window for extra safety
+        window.startInterviewFromModule = startInterviewFromModule;
 
         // Handle manual experience input
         async function saveExperience() {

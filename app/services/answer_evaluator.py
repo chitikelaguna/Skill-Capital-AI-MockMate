@@ -107,6 +107,17 @@ Provide scores and feedback as specified. Note the response time in your feedbac
     ) -> AnswerScore:
         """Evaluate an answer and return scores"""
         
+        # ✅ FIX: Return 0 scores for "No Answer"
+        if answer == "No Answer":
+            return AnswerScore(
+                relevance=0,
+                confidence=0,
+                technical_accuracy=0,
+                communication=0,
+                overall=0,
+                feedback="No answer provided."
+            )
+        
         if not self.openai_available:
             # Return default scores if OpenAI is not available
             return self._get_default_scores(answer)

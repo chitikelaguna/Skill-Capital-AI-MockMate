@@ -358,9 +358,10 @@ CREATE TABLE IF NOT EXISTS hr_round (
     question_number INTEGER NOT NULL,
     question_text TEXT NOT NULL,
     question_category TEXT, -- Communication, Cultural Fit, Motivation, Career Goals, etc.
+    audio_url TEXT, -- TTS audio URL for the question (added for consistency with technical_round)
     
     -- User Answer
-    user_answer TEXT NOT NULL,
+    user_answer TEXT NOT NULL DEFAULT '', -- Allow empty string initially, will be updated when user submits answer
     
     -- Evaluation Scores (0-100)
     communication_score INTEGER, -- Clarity and effectiveness of communication
@@ -385,9 +386,11 @@ CREATE POLICY "Users can view own HR results"
     ON hr_round FOR SELECT
     USING (auth.uid()::text = user_id OR auth.jwt()->>'role' = 'service_role');
 
+-- Service role can manage all HR results (INSERT, UPDATE, DELETE, SELECT)
 CREATE POLICY "Service role can manage all HR results"
     ON hr_round FOR ALL
-    USING (auth.jwt()->>'role' = 'service_role');
+    USING (auth.jwt()->>'role' = 'service_role')
+    WITH CHECK (auth.jwt()->>'role' = 'service_role');
 
 -- Indexes for hr_round
 CREATE INDEX IF NOT EXISTS idx_hr_round_user_id ON hr_round(user_id);
@@ -539,6 +542,63 @@ BEGIN
 END $$;
 
 -- ============================================================
+-- MIGRATION: Add missing columns to existing hr_round table
+-- ============================================================
+-- This section adds missing columns if they don't exist
+-- Safe to run multiple times - uses IF NOT EXISTS checks
+-- ============================================================
+
+-- Add audio_url column to hr_round if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public'
+        AND table_name = 'hr_round' 
+        AND column_name = 'audio_url'
+    ) THEN
+        ALTER TABLE hr_round ADD COLUMN audio_url TEXT;
+        RAISE NOTICE '✓ Added audio_url column to hr_round table';
+    ELSE
+        RAISE NOTICE '✓ audio_url column already exists in hr_round table';
+    END IF;
+END $$;
+
+-- Modify user_answer to allow empty string as default
+DO $$
+BEGIN
+    -- Check if user_answer has a default value
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public'
+        AND table_name = 'hr_round' 
+        AND column_name = 'user_answer'
+        AND column_default IS NULL
+    ) THEN
+        -- Set default to empty string
+        ALTER TABLE hr_round ALTER COLUMN user_answer SET DEFAULT '';
+        RAISE NOTICE '✓ Set user_answer default to empty string in hr_round table';
+    ELSE
+        RAISE NOTICE '✓ user_answer already has a default value in hr_round table';
+    END IF;
+END $$;
+
+-- Fix RLS policy to include WITH CHECK clause for proper UPDATE support
+DO $$
+BEGIN
+    -- Drop existing policy if it exists
+    DROP POLICY IF EXISTS "Service role can manage all HR results" ON hr_round;
+    
+    -- Create new policy with proper WITH CHECK clause
+    CREATE POLICY "Service role can manage all HR results"
+        ON hr_round FOR ALL
+        USING (auth.jwt()->>'role' = 'service_role')
+        WITH CHECK (auth.jwt()->>'role' = 'service_role');
+    
+    RAISE NOTICE '✓ Updated RLS policy for hr_round with WITH CHECK clause';
+END $$;
+
+-- ============================================================
 -- SCHEMA CREATION COMPLETE
 -- ============================================================
 -- All tables, policies, indexes, triggers, and foreign keys have been created
@@ -549,11 +609,13 @@ END $$;
 --    ✓ user_profiles (user_id: TEXT)
 --    ✓ interview_sessions (user_id: TEXT, FK to user_profiles)
 --    ✓ coding_round (user_id: TEXT)
---    ✓ technical_round (user_id: TEXT)
---    ✓ hr_round (user_id: TEXT)
+--    ✓ technical_round (user_id: TEXT, audio_url: TEXT)
+--    ✓ hr_round (user_id: TEXT, audio_url: TEXT) ← VERIFY audio_url EXISTS
 --    ✓ star_round (user_id: TEXT)
 --    ✓ question_templates
 --    ✓ interview_transcripts
 -- 3. Verify foreign key: interview_sessions.user_id → user_profiles.user_id
 -- 4. Verify storage bucket "resume-uploads" exists (create manually if needed)
+-- 5. Verify hr_round.audio_url column exists (added in migration)
+-- 6. Verify RLS policy "Service role can manage all HR results" has WITH CHECK clause
 -- ============================================================
