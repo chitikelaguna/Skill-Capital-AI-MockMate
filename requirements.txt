@@ -1,6 +1,7 @@
 # Skill Capital AI MockMate - Backend Dependencies
 # Production-ready requirements with exact versions
 # This file is used by Vercel for deployment
+# Optimized to reduce bundle size
 
 # Web Framework
 fastapi==0.115.0
@@ -23,33 +24,16 @@ langchain-community==0.3.7
 langchain-openai==0.2.8
 openai==1.54.3
 
-# Voice Processing (Whisper API)
-openai-whisper==20231117
-
-# Document Processing
+# Document Processing (optimized - kept only essential parsers)
 PyMuPDF==1.24.14
 python-docx==1.1.2
-PyPDF2==3.0.1
-pdfminer.six==20221105
 pdfplumber==0.10.3
 
-# OCR Support (for LaTeX PDFs and scanned documents)
+# OCR Support (for LaTeX PDFs and scanned documents - optional, can be disabled)
 pytesseract==0.3.13
 pdf2image==1.17.0
 Pillow==10.4.0
 
 # Async File Operations
 aiofiles==24.1.0
-
-# Data Science & Analysis Libraries (for coding interview execution)
-pandas==2.2.2
-numpy==1.26.4
-matplotlib==3.8.4
-seaborn==0.13.2
-scikit-learn==1.5.0
-
-# Development Dependencies (optional)
-pytest==8.3.3
-pytest-asyncio==0.24.0
-pytest-cov==6.0.0
 

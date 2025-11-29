@@ -590,7 +590,7 @@ async def upload_resume(
             error_msg = str(parse_error).lower()
             logger.error(f"Unexpected parsing error: {parse_error}")
             if "not installed" in error_msg or "import" in error_msg:
-                user_error = "Resume parsing library not installed. Please install: pip install pdfminer.six pdfplumber python-docx PyMuPDF"
+                user_error = "Resume parsing library not installed. Please install: pip install pdfplumber python-docx PyMuPDF"
             else:
                 user_error = f"Failed to parse resume: {str(parse_error)}"
             

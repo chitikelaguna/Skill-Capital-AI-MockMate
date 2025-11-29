@@ -141,7 +141,7 @@ class ResumeParser:
             except ImportError:
                 raise Exception(
                     "PDF parsing libraries not available. Please install one of: "
-                    "pip install pymupdf OR pip install PyPDF2 OR pip install pdfplumber"
+                    "pip install pymupdf OR pip install pdfplumber"
                 )
         except Exception as e:
             error_msg = str(e)

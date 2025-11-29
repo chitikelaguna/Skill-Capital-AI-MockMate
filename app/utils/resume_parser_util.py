@@ -32,11 +32,9 @@ except (ImportError, Exception):
     PYMUPDF_AVAILABLE = False
     pass
 
-try:
-    import PyPDF2
-    PYPDF2_AVAILABLE = True
-except ImportError:
-    pass
+# PyPDF2 removed to reduce bundle size - using pdfplumber as fallback instead
+PYPDF2_AVAILABLE = False
+PyPDF2 = None
 
 try:
     import pdfplumber
@@ -44,11 +42,9 @@ try:
 except ImportError:
     pass
 
-try:
-    from pdfminer.high_level import extract_text as pdfminer_extract
-    PDFMINER_AVAILABLE = True
-except ImportError:
-    pass
+# pdfminer.six removed to reduce bundle size - using pdfplumber as fallback instead
+PDFMINER_AVAILABLE = False
+pdfminer_extract = None
 
 # DOCX Parsing
 DOCX_AVAILABLE = False
@@ -291,15 +287,16 @@ def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
         available_parsers.append("PyMuPDF")
     if PDFPLUMBER_AVAILABLE:
         available_parsers.append("pdfplumber")
-    if PDFMINER_AVAILABLE:
-        available_parsers.append("pdfminer.six")
-    if PYPDF2_AVAILABLE:
-        available_parsers.append("PyPDF2")
+    # Removed pdfminer.six and PyPDF2 to reduce bundle size
+    # if PDFMINER_AVAILABLE:
+    #     available_parsers.append("pdfminer.six")
+    # if PYPDF2_AVAILABLE:
+    #     available_parsers.append("PyPDF2")
     
     logger.info(f"[RESUME_PARSER] Available PDF parsers: {', '.join(available_parsers) if available_parsers else 'NONE'}")
     
     if not available_parsers:
-        raise ImportError("No PDF parsing libraries are installed. Please install: pip install PyMuPDF pdfplumber pdfminer.six PyPDF2")
+        raise ImportError("No PDF parsing libraries are installed. Please install: pip install PyMuPDF pdfplumber")
     
     text = None
     parser_used = None
@@ -366,53 +363,8 @@ def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
                 last_error = str(e)
                 logger.error(f"[RESUME_PARSER] pdfplumber failed: {str(e)}")
     
-    # Fallback to pdfminer.six
-    if not text or not text_is_meaningful:
-        if PDFMINER_AVAILABLE:
-            try:
-                logger.debug(f"[RESUME_PARSER] Attempting pdfminer.six parsing...")
-                text = pdfminer_extract(file_path)
-                if text:
-                    text_is_meaningful = is_text_meaningful(text, min_length=20)
-                    if text_is_meaningful:
-                        parser_used = "pdfminer.six"
-                        logger.info(f"[RESUME_PARSER] pdfminer.six SUCCESS - Extracted {len(text)} meaningful characters")
-                    else:
-                        logger.warning(f"[RESUME_PARSER] pdfminer.six extracted {len(text)} chars but text appears to be metadata only")
-                        # Don't reset text - continue to next parser
-            except Exception as e:
-                last_error = str(e)
-                logger.error(f"[RESUME_PARSER] pdfminer.six failed: {str(e)}")
-    
-    # Fallback to PyPDF2
-    if not text or not text_is_meaningful:
-        if PYPDF2_AVAILABLE:
-            try:
-                logger.debug(f"[RESUME_PARSER] Attempting PyPDF2 parsing...")
-                with open(file_path, 'rb') as pdf_file:
-                    pdf_reader = PyPDF2.PdfReader(pdf_file)
-                    text_parts = []
-                    for page_num, page in enumerate(pdf_reader.pages):
-                        try:
-                            page_text = page.extract_text()
-                            if page_text:
-                                text_parts.append(page_text)
-                                logger.debug(f"[RESUME_PARSER] PyPDF2 extracted {len(page_text)} chars from page {page_num + 1}")
-                        except Exception as page_error:
-                            logger.warning(f"[RESUME_PARSER] PyPDF2 failed on page {page_num + 1}: {str(page_error)}")
-                    text = "\n".join(text_parts)
-                
-                if text:
-                    text_is_meaningful = is_text_meaningful(text, min_length=20)
-                    if text_is_meaningful:
-                        parser_used = "PyPDF2"
-                        logger.info(f"[RESUME_PARSER] PyPDF2 SUCCESS - Extracted {len(text)} meaningful characters")
-                    else:
-                        logger.warning(f"[RESUME_PARSER] PyPDF2 extracted {len(text)} chars but text appears to be metadata only")
-                        # Don't reset text - will check after all parsers
-            except Exception as e:
-                last_error = str(e)
-                logger.error(f"[RESUME_PARSER] PyPDF2 failed: {str(e)}")
+    # Removed pdfminer.six and PyPDF2 fallbacks to reduce bundle size
+    # Using only PyMuPDF and pdfplumber as they are sufficient for most PDFs
     
         # Final check: if we have text but it wasn't marked as meaningful, 
         # check one more time with more lenient criteria before giving up
