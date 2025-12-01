@@ -101,7 +101,6 @@ function setupEventListeners() {
 async function startInterview() {
     // Prevent double submission
     if (isLoading.startInterview) {
-        console.warn('[HR INTERVIEW] Start interview already in progress, ignoring duplicate call');
         return;
     }
     
@@ -148,9 +147,6 @@ async function startInterview() {
         }
 
         const data = await response.json();
-        
-        console.log('[HR INTERVIEW] Start response data:', data);
-        console.log('[HR INTERVIEW] audio_url in response:', data.audio_url);
         
         interviewSessionId = data.session_id;
         interviewActive = true;

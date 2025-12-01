@@ -634,7 +634,7 @@
 
                         <div class="action-buttons" style="margin-top: 30px;">
                             <button class="btn btn-primary" onclick="window.location.href='index.html'">Back to Dashboard</button>
-                            <button class="btn btn-secondary" onclick="window.location.href='technical-interview.html'">Start New Interview</button>
+                            <button class="btn btn-secondary" onclick="window.location.href='interview.html'">Start New Interview</button>
                         </div>
                     </div>
                 </div>
@@ -643,7 +643,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>&copy; 2024 Skill Capital AI MockMate</p>
+            <p>&copy; 2026 Skill Capital AI MockMate</p>
         </footer>
     </div>
 
@@ -846,9 +846,6 @@
 
                 const data = await response.json();
                 
-                console.log('[TECHNICAL INTERVIEW] Start response data:', data);
-                console.log('[TECHNICAL INTERVIEW] audio_url in response:', data.audio_url);
-                
                 interviewSessionId = data.session_id;
                 interviewActive = true;
                 conversationHistory = [];  // Start with empty history (like HR/STAR)
@@ -883,10 +880,9 @@
                     
                     // Play audio if available
                     if (data.audio_url) {
-                        console.log('[TECHNICAL INTERVIEW] ✅ audio_url found, calling playAudio:', data.audio_url);
                         setTimeout(() => {
                             playAudio(data.audio_url).catch(err => {
-                                console.warn('[TECHNICAL INTERVIEW] Audio playback failed, will show manual play button:', err);
+                                // Audio playback failed, manual play button will be shown
                             });
                         }, 100);
                     } else {
@@ -902,7 +898,7 @@
                     <div class="error-message">
                         <h3>Failed to Start Interview</h3>
                         <p>${error.message || 'Please ensure you have uploaded a resume with technical skills.'}</p>
-                        <button class="btn btn-primary" onclick="window.location.href='technical-interview.html'" style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="window.location.href='interview.html'" style="margin-top: 15px;">
                             Go Back
                         </button>
                     </div>
@@ -1088,8 +1084,6 @@
             document.getElementById('voiceStatus').textContent = 'Submitting answer...';
 
             try {
-                console.log('[SUBMIT ANSWER] Submitting answer to backend...');
-                
                 // ✅ CONVERSATIONAL FLOW: Use the new submit-answer endpoint
                 const response = await fetch(`${getApiBase()}/api/interview/technical/${interviewSessionId}/submit-answer`, {
                     method: 'POST',
@@ -1106,7 +1100,6 @@
                 }
 
                 const data = await response.json();
-                console.log('[SUBMIT ANSWER] Answer submitted successfully');
 
                 // Display AI response if any
                 if (data.ai_response) {
@@ -1119,7 +1112,7 @@
                     
                     if (data.ai_response_audio_url || data.audio_url) {
                         playAudio(data.ai_response_audio_url || data.audio_url).catch(err => {
-                            console.warn('[TECHNICAL INTERVIEW] Audio playback failed:', err);
+                            // Audio playback failed
                         });
                     }
                 }
@@ -1127,7 +1120,6 @@
                 // Check if interview is complete (10 questions for Technical - same as HR/STAR)
                 const aiQuestionsCount = conversationHistory.filter(m => m.role === 'ai').length;
                 if (data.interview_completed || aiQuestionsCount >= 10) {
-                    console.log(`[SUBMIT ANSWER] Interview completed: ${aiQuestionsCount} questions asked`);
                     await showSummary();
                 } else {
                     // ✅ CONVERSATIONAL FLOW: Get next question after a short delay
@@ -1161,11 +1153,6 @@
             }
 
             try {
-                console.log('[TECHNICAL INTERVIEW] Fetching next question from backend...');
-                if (userAnswer) {
-                    console.log('[TECHNICAL INTERVIEW] Sending user answer for context-aware question generation');
-                }
-                
                 // ✅ CONVERSATIONAL FLOW: Call backend endpoint to get next AI-generated technical question
                 const requestBody = {};
                 if (userAnswer) {
@@ -1187,7 +1174,6 @@
                 
                 // Check if interview is completed
                 if (data.interview_completed) {
-                    console.log('[TECHNICAL INTERVIEW] Interview completed:', data.message);
                     await showSummary();
                     return;
                 }
@@ -1198,8 +1184,6 @@
                 if (!nextQuestion) {
                     throw new Error('No question received from backend');
                 }
-                
-                console.log('[TECHNICAL INTERVIEW] Received question:', nextQuestion.substring(0, 50) + '...');
                 
                 // Update current question
                 currentQuestion = nextQuestion;
@@ -1217,14 +1201,13 @@
                 // ✅ FIX: ALWAYS play audio for every question
                 setTimeout(() => {
                     if (audioUrl && audioUrl.trim()) {
-                        console.log('[TECHNICAL INTERVIEW] ✅ Playing next question audio:', audioUrl);
                         playAudio(audioUrl).catch(err => {
-                            console.warn('[TECHNICAL INTERVIEW] Audio playback failed:', err);
+                            // Audio playback failed
                         });
                     } else if (nextQuestion) {
                         // Fallback: generate TTS from question text
                         playAudio(nextQuestion).catch(err => {
-                            console.warn('[TECHNICAL INTERVIEW] Fallback TTS generation failed:', err);
+                            // Fallback TTS generation failed
                         });
                     }
                 }, 100);
@@ -1310,7 +1293,6 @@
         async function playAudio(textOrUrl, retryCount = 0) {
             const MAX_RETRIES = 2;
             if (!textOrUrl) {
-                console.warn('[TTS] No text or URL provided');
                 return;
             }
             
@@ -1346,7 +1328,6 @@
                 }
                 
                 if (!text || text.trim().length === 0) {
-                    console.warn('[TTS] No text provided for TTS');
                     return;
                 }
                 
@@ -1378,7 +1359,7 @@
                 // Check content type
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('audio')) {
-                    console.warn('[TTS] Unexpected content type:', contentType);
+                    // Unexpected content type, but continue
                 }
                 
                 // Get audio blob

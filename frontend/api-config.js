@@ -13,7 +13,6 @@ if (typeof window.API_BASE === 'undefined') {
     window.API_BASE_READY = false; // Flag to track if API_BASE is configured
 } else {
     // If already exists (from cached script), reset it
-    console.warn('[API-CONFIG] ⚠️ API_BASE already exists - reinitializing');
     window.API_BASE = null;
     window.API_BASE_READY = false;
 }
@@ -97,14 +96,9 @@ function getDefaultApiBase() {
                     // Backend returned invalid URL - keep our default (127.0.0.1:8000)
                     // Don't change window.API_BASE, it's already set to the correct default
                 }
-            } else {
-                console.warn('[API-CONFIG] ⚠️ API config response missing api_base_url, using default');
             }
-        } else {
-            console.warn('[API-CONFIG] ⚠️ API config endpoint returned status:', response.status);
         }
     } catch (error) {
-        console.warn('[API-CONFIG] ⚠️ Could not fetch API config, using default:', error.message);
         // Keep the default we set earlier
     }
 })();

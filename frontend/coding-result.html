@@ -276,8 +276,6 @@
                 const data = await response.json();
                 
                 if (!data.results || data.results.length === 0) {
-                    console.warn('No results found for this session');
-                    
                     document.getElementById('loadingState').innerHTML = `
                         <h2 style="color: #f57f17;">No Results Found</h2>
                         <p>No coding results were found for session: ${sessionId}</p>
@@ -301,8 +299,6 @@
                 // Display statistics
                 if (data.statistics) {
                     displayStatistics(data.statistics);
-                } else {
-                    console.warn('No statistics in response');
                 }
                 
                 // Display questions

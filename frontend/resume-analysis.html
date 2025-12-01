@@ -321,7 +321,7 @@
         </main>
 
         <footer class="footer">
-            <p>&copy; 2024 Skill Capital AI MockMate</p>
+            <p>&copy; 2026 Skill Capital AI MockMate</p>
         </footer>
     </div>
 
@@ -347,7 +347,7 @@
                     displayAnalysis(data);
                     return;
                 } catch (e) {
-                    console.warn('Failed to parse cached data, fetching from server');
+                    // Failed to parse cached data, fetching from server
                 }
             }
             
@@ -359,7 +359,6 @@
             try {
                 // Check if session_id starts with "error_" - this means it's an error session
                 if (sessionId && sessionId.startsWith('error_')) {
-                    console.warn('Error session detected, using cached data from sessionStorage');
                     if (cachedData) {
                         try {
                             const data = JSON.parse(cachedData);
@@ -386,7 +385,6 @@
                 if (!res.ok) {
                     // If 404 and we have cached data, use it
                     if (res.status === 404 && cachedData) {
-                        console.warn('Backend returned 404, using cached data from sessionStorage');
                         try {
                             const data = JSON.parse(cachedData);
                             if (data.success === false && data.error) {
@@ -646,11 +644,8 @@
 
         // Make function globally accessible - define it early to ensure it's available
         function startInterviewFromModule(moduleType) {
-            console.log('[NAVIGATION] startInterviewFromModule called with moduleType:', moduleType, 'type:', typeof moduleType);
-            
             // Normalize module type (trim and lowercase for safety)
             const normalizedType = String(moduleType || '').trim().toLowerCase();
-            console.log('[NAVIGATION] Normalized type:', normalizedType);
             
             // Store the module type in sessionStorage for reference
             sessionStorage.setItem('selectedInterviewModule', normalizedType);
@@ -660,31 +655,25 @@
             
             switch(normalizedType) {
                 case 'technical':
-                    targetUrl = 'technical-interview.html';
-                    console.log('[NAVIGATION] Redirecting to technical-interview.html');
+                    targetUrl = 'interview.html';
                     break;
                 case 'coding':
                     targetUrl = 'coding-interview.html';
-                    console.log('[NAVIGATION] Redirecting to coding-interview.html');
                     break;
                 case 'hr':
                     targetUrl = 'hr-interview.html';
-                    console.log('[NAVIGATION] Redirecting to hr-interview.html');
                     break;
                 case 'behavioral':
                 case 'star':
                     targetUrl = 'star-interview.html';
-                    console.log('[NAVIGATION] Redirecting to star-interview.html');
                     break;
                 default:
                     targetUrl = 'index.html';
-                    console.log('[NAVIGATION] Unknown module type:', normalizedType, '- redirecting to dashboard');
                     break;
             }
             
             // Perform navigation
             if (targetUrl) {
-                console.log('[NAVIGATION] Navigating to:', targetUrl);
                 window.location.href = targetUrl;
             }
             
@@ -729,7 +718,7 @@
                             }
                         }
                     } catch (e) {
-                        console.warn('Could not get current user:', e);
+                        // Could not get current user
                     }
                 }
                 

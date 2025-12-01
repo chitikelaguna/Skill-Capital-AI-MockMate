@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 
 # PDF Parsing Libraries
 PYMUPDF_AVAILABLE = False
-PYPDF2_AVAILABLE = False
 PDFPLUMBER_AVAILABLE = False
-PDFMINER_AVAILABLE = False
 
 try:
     import fitz  # PyMuPDF
@@ -32,19 +30,11 @@ except (ImportError, Exception):
     PYMUPDF_AVAILABLE = False
     pass
 
-# PyPDF2 removed to reduce bundle size - using pdfplumber as fallback instead
-PYPDF2_AVAILABLE = False
-PyPDF2 = None
-
 try:
     import pdfplumber
     PDFPLUMBER_AVAILABLE = True
 except ImportError:
     pass
-
-# pdfminer.six removed to reduce bundle size - using pdfplumber as fallback instead
-PDFMINER_AVAILABLE = False
-pdfminer_extract = None
 
 # DOCX Parsing
 DOCX_AVAILABLE = False
@@ -287,11 +277,6 @@ def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
         available_parsers.append("PyMuPDF")
     if PDFPLUMBER_AVAILABLE:
         available_parsers.append("pdfplumber")
-    # Removed pdfminer.six and PyPDF2 to reduce bundle size
-    # if PDFMINER_AVAILABLE:
-    #     available_parsers.append("pdfminer.six")
-    # if PYPDF2_AVAILABLE:
-    #     available_parsers.append("PyPDF2")
     
     logger.info(f"[RESUME_PARSER] Available PDF parsers: {', '.join(available_parsers) if available_parsers else 'NONE'}")
     
@@ -362,9 +347,6 @@ def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
             except Exception as e:
                 last_error = str(e)
                 logger.error(f"[RESUME_PARSER] pdfplumber failed: {str(e)}")
-    
-    # Removed pdfminer.six and PyPDF2 fallbacks to reduce bundle size
-    # Using only PyMuPDF and pdfplumber as they are sufficient for most PDFs
     
         # Final check: if we have text but it wasn't marked as meaningful, 
         # check one more time with more lenient criteria before giving up

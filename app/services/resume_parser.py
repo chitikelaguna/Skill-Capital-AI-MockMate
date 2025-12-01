@@ -103,46 +103,28 @@ class ResumeParser:
                 error_msg = str(e)
                 # Continue to fallback below
         
-        # Fallback: Try using PyPDF2 or pdfplumber if available
+        # Fallback: Try using pdfplumber if available
         try:
-            import PyPDF2
-            with open(file_path, 'rb') as pdf_file:
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
+            import pdfplumber
+            with pdfplumber.open(file_path) as pdf:
                 text = ""
-                for page_num, page in enumerate(pdf_reader.pages):
+                for page_num, page in enumerate(pdf.pages):
                     try:
                         page_text = page.extract_text() or ""
                         if page_text:
                             text += page_text + "\n"
                     except Exception as page_error:
                         continue
-                
-                if not text or len(text.strip()) < 10:
-                    raise Exception("PDF file appears to be empty or contains no extractable text.")
-                
-                return text
+                    
+                    if not text or len(text.strip()) < 10:
+                        raise Exception("PDF file appears to be empty or contains no extractable text.")
+                    
+                    return text
         except ImportError:
-            try:
-                import pdfplumber
-                with pdfplumber.open(file_path) as pdf:
-                    text = ""
-                    for page_num, page in enumerate(pdf.pages):
-                        try:
-                            page_text = page.extract_text() or ""
-                            if page_text:
-                                text += page_text + "\n"
-                        except Exception as page_error:
-                            continue
-                        
-                        if not text or len(text.strip()) < 10:
-                            raise Exception("PDF file appears to be empty or contains no extractable text.")
-                        
-                        return text
-            except ImportError:
-                raise Exception(
-                    "PDF parsing libraries not available. Please install one of: "
-                    "pip install pymupdf OR pip install pdfplumber"
-                )
+            raise Exception(
+                "PDF parsing libraries not available. Please install one of: "
+                "pip install pymupdf OR pip install pdfplumber"
+            )
         except Exception as e:
             error_msg = str(e)
             error_msg_lower = error_msg.lower()  # Cache lowercased string
