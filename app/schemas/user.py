@@ -5,7 +5,6 @@ Pydantic models for request/response validation
 
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
-from datetime import datetime
 
 
 class UserProfileCreate(BaseModel):
@@ -47,9 +46,9 @@ class UserProfileResponse(BaseModel):
     skills: Optional[List[str]] = []  # Default to empty list if null from DB
     experience_level: Optional[str] = None
     resume_url: Optional[str] = None
-    access_role: Optional[str] = "Student"  # Default to "Student"
-    created_at: Optional[datetime] = None  # Make optional in case of missing data
-    updated_at: Optional[datetime] = None  # Make optional in case of missing data
+    access_role: Optional[str] = None  # No default - use None if not present
+    created_at: Optional[str] = None  # ISO format string for JSON serialization
+    updated_at: Optional[str] = None  # ISO format string for JSON serialization
     
     class Config:
         """Pydantic configuration"""

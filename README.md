@@ -51,7 +51,7 @@
 - ✅ **FastAPI Backend** - RESTful API with automatic OpenAPI documentation (Swagger/ReDoc)
 - ✅ **Unified Frontend/Backend** - FastAPI serves both API and static frontend files
 - ✅ **Supabase Integration** - PostgreSQL database with Row Level Security (RLS) and storage
-- ✅ **Resume Upload & Parsing** - Support for PDF and DOCX files with OCR fallback (Tesseract)
+- ✅ **Resume Upload & Parsing** - Support for PDF and DOCX files with text extraction
 - ✅ **AI-Powered Question Generation** - Context-aware questions using OpenAI GPT models via LangChain
 - ✅ **Multiple Interview Modes** - Technical, Coding, HR, and STAR (behavioral) interviews
 - ✅ **Real-time Answer Evaluation** - AI-powered scoring with detailed feedback after each answer
@@ -66,7 +66,7 @@
 - ✅ **Automatic Skill Extraction** - Extracts technologies, tools, and skills from resumes
 - ✅ **Experience Level Detection** - Identifies experience level from resume content
 - ✅ **Resume Keyword Extraction** - Extracts technologies, job titles, and projects
-- ✅ **OCR Support** - Tesseract OCR for LaTeX-generated and scanned PDFs
+- ✅ **Text Extraction** - Automatic text extraction from PDF and DOCX files
 
 ### Interview Features
 
@@ -203,7 +203,7 @@ For detailed architecture diagrams, see [`architecture.tex`](architecture.tex) (
 - **PyMuPDF (fitz)** - Primary PDF text extraction
 - **pdfplumber** - Advanced PDF parsing
 - **python-docx** - DOCX parsing
-- **Tesseract OCR** - Image-based PDF parsing
+- **Text Extraction** - PDF and DOCX text extraction libraries
 
 ---
 
@@ -215,7 +215,6 @@ For detailed architecture diagrams, see [`architecture.tex`](architecture.tex) (
 - **pip** (Python package manager)
 - **Supabase Account** - For database and storage
 - **OpenAI API Key** - For AI features (question generation, evaluation)
-- **Tesseract OCR** (Optional but recommended) - For LaTeX/scanned PDF parsing
 
 ### Backend Setup
 
@@ -251,29 +250,12 @@ pip install -r requirements.txt
 
    **Note**: The `requirements.txt` file is in the project root, not in the `app/` directory.
 
-5. **Install Tesseract OCR** (Optional but recommended):
-
-   **Windows:**
-   - Download from: https://github.com/UB-Mannheim/tesseract/wiki
-   - Install to default location: `C:\Program Files\Tesseract-OCR\`
-
-   **Linux (Ubuntu/Debian):**
-   ```bash
-   sudo apt-get update
-   sudo apt-get install tesseract-ocr
-   ```
-
-   **macOS:**
-   ```bash
-   brew install tesseract
-   ```
-
-6. **Set up Supabase Database**:
+5. **Set up Supabase Database**:
    - Create a new Supabase project at https://supabase.com
    - Go to SQL Editor and run the SQL from `app/database/schema.sql`
-   - Create a storage bucket named `resumes` (public access)
+   - Create a storage bucket named `resume-uploads` (public access)
 
-7. **Create `.env` file** in the project root:
+6. **Create `.env` file** in the project root:
 ```bash
 # OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key_here
@@ -291,16 +273,23 @@ ENVIRONMENT=development
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:8000
 ```
 
-8. **Run the application**:
-```bash
-python app/main.py
-```
+7. **Run the application**:
 
-The application will:
-- Start the FastAPI server at `http://127.0.0.1:8000`
-- Serve the frontend at `http://127.0.0.1:8000/`
-- Auto-open your browser (if configured)
-- API documentation available at `http://127.0.0.1:8000/docs`
+   **Option 1: Using Python directly (recommended for development)**:
+   ```bash
+   python app/main.py
+   ```
+
+   **Option 2: Using uvicorn directly**:
+   ```bash
+   uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+   The application will:
+   - Start the FastAPI server at `http://127.0.0.1:8000`
+   - Serve the frontend at `http://127.0.0.1:8000/`
+   - Auto-open your browser (development mode only)
+   - API documentation available at `http://127.0.0.1:8000/docs`
 
 ### Frontend Setup
 
@@ -363,7 +352,7 @@ All configuration is done through environment variables in the `.env` file:
 3. **Create Storage Bucket**:
    - Go to Storage in Supabase Dashboard
    - Click "New bucket"
-   - Name: `resumes`
+   - Name: `resume-uploads`
    - Set to **Public bucket** (or configure RLS policies for authenticated access)
    - Click "Create bucket"
    - Verify bucket is created and accessible
@@ -686,12 +675,11 @@ Skill-Capital-AI-MockMate/
 
 5. **Post-Deployment**:
    - Ensure Supabase database schema is set up
-   - Create `resumes` storage bucket in Supabase
+   - Create `resume-uploads` storage bucket in Supabase
    - Test the application at your Vercel URL
 
 **Important Notes for Vercel**:
 - Code execution uses Piston API fallback (no local compilers)
-- Tesseract OCR may not work (logs warning, continues without OCR)
 - All API routes are serverless functions
 - Frontend is served through FastAPI static file serving
 
@@ -699,15 +687,17 @@ Skill-Capital-AI-MockMate/
 
 ```bash
 # Install dependencies
-pip install -r app/requirements.txt
+pip install -r requirements.txt
 
 # Set environment variables
 export OPENAI_API_KEY=your_key
 export SUPABASE_URL=your_url
-# ... etc
+export SUPABASE_KEY=your_anon_key
+export SUPABASE_SERVICE_KEY=your_service_key
+export ENVIRONMENT=production
 
-# Run with uvicorn
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Run with uvicorn (production)
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4
 ```
 
 ---
@@ -769,9 +759,9 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
    - Verify key is active at https://platform.openai.com/api-keys
 
 3. **Resume parsing fails for LaTeX PDFs**
-   - Install Tesseract OCR (see setup instructions)
-   - Ensure Tesseract is in system PATH
-   - On Vercel, OCR may not work (system will continue without it)
+   - LaTeX-generated PDFs may not have extractable text
+   - Export LaTeX PDFs as PDF/A from Overleaf for better compatibility
+   - Ensure PDF has selectable text (not just vector graphics)
 
 4. **CORS errors**
    - Check `CORS_ORIGINS` in `.env`
@@ -870,7 +860,6 @@ For issues and questions, please open an issue on the repository.
 - Comprehensive API documentation
 
 ### Known Limitations ⚠️
-- Tesseract OCR not available on Vercel (logs warning, continues without OCR)
 - Local code execution requires system compilers (Piston API fallback available)
 - In-memory rate limiting (resets on server restart)
 

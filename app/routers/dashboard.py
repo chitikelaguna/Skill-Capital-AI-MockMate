@@ -31,8 +31,17 @@ async def get_performance_dashboard(
     supabase: Client = Depends(get_supabase_client),
     _: None = Depends(rate_limit_by_user_id)
 ):
+    # CRITICAL FIX: Strictly require non-empty user_id
+    if not user_id or not user_id.strip():
+        logger.error(f"[DASHBOARD] ❌ SECURITY: Empty user_id provided")
+        raise HTTPException(
+            status_code=400,
+            detail="user_id is required and cannot be empty. Please provide a valid user_id."
+        )
+    
     # Validate user_id format: alphanumeric, hyphen, underscore only
     if not re.match(r'^[a-zA-Z0-9_-]+$', user_id):
+        logger.error(f"[DASHBOARD] ❌ Invalid user_id format: {user_id}")
         raise HTTPException(status_code=400, detail="Invalid user_id format")
     
     # Validate pagination parameters if provided
@@ -273,7 +282,9 @@ async def get_performance_dashboard(
             logger.warning(f"[DASHBOARD][PERFORMANCE] Failed to fetch user profile: {str(db_err)}")
             resume_summary = None
         
-        return PerformanceDashboardResponse(
+        # BUG FIX #2: Create response with Cache-Control headers
+        from fastapi.responses import JSONResponse
+        response_data = PerformanceDashboardResponse(
             user_id=user_id,
             total_interviews=len(sessions),
             average_score=round(average_score, 2),
@@ -282,6 +293,13 @@ async def get_performance_dashboard(
             skill_analysis=skill_analysis,
             resume_summary=resume_summary
         )
+        response = JSONResponse(content=response_data.dict())
+        # BUG FIX #2: Set cache headers to prevent Vercel/CDN caching
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
         
     except HTTPException:
         raise

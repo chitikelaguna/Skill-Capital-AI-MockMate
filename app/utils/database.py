@@ -2,10 +2,15 @@
 Database utility functions for optimized queries
 """
 
+import json
+import logging
 from typing import Optional, List, Dict, Any
 from supabase import Client
 from datetime import datetime
 from app.utils.exceptions import NotFoundError, DatabaseError
+from app.utils.profile_normalizer import prepare_profile_for_pydantic
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_user_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -13,6 +18,7 @@ def sanitize_user_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
     Sanitize user profile data from database
     Converts None values to appropriate defaults for list/array fields
     Ensures all fields are present with consistent types
+    Normalizes JSONB fields that might be stored as strings
     
     Time Complexity: O(1) - Constant time field updates
     Space Complexity: O(1) - In-place updates
@@ -26,36 +32,52 @@ def sanitize_user_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
     if not profile:
         return profile
     
-    # Create a copy to avoid mutating the original
-    sanitized = profile.copy()
+    # Use the profile normalizer to handle JSONB fields and prepare for Pydantic
+    sanitized = prepare_profile_for_pydantic(profile)
     
-    # Convert None to empty list for array/list fields
-    # These fields should always be lists, never None
-    list_fields = ['skills', 'projects', 'education', 'experience']
-    for field in list_fields:
-        if field in sanitized:
-            # If field exists but is None, convert to empty list
-            if sanitized[field] is None:
-                sanitized[field] = []
-            # If field is not a list (shouldn't happen, but be safe), convert to list
-            elif not isinstance(sanitized[field], list):
-                sanitized[field] = []
-        else:
-            # Field doesn't exist, add it as empty list
-            sanitized[field] = []
-    
-    # Ensure optional string fields are None instead of missing
-    # These fields can be None, but should exist in the dict
-    optional_string_fields = ['name', 'experience_level', 'resume_url']
-    for field in optional_string_fields:
-        if field not in sanitized:
-            sanitized[field] = None
-    
-    # Ensure access_role defaults to "Student" if not set or None
-    if 'access_role' not in sanitized or not sanitized.get('access_role'):
-        sanitized['access_role'] = 'Student'
+    logger.debug(f"[SANITIZE] Sanitized profile for user_id: {sanitized.get('user_id')}")
     
     return sanitized
+
+
+def _check_supabase_response_for_html_error(response: Any) -> Optional[str]:
+    """
+    Check if Supabase response contains HTML error content.
+    PostgREST sometimes returns HTML error pages instead of JSON.
+    
+    Args:
+        response: Supabase response object
+    
+    Returns:
+        Error message if HTML detected, None otherwise
+    """
+    try:
+        # Check response data for HTML content
+        if hasattr(response, 'data'):
+            if response.data is not None:
+                # If data is a string and looks like HTML, it's an error
+                if isinstance(response.data, str):
+                    if response.data.strip().startswith('<'):
+                        return "Supabase returned HTML error response"
+        
+        # Check response text/body if available
+        if hasattr(response, 'text'):
+            text = response.text
+            if text and isinstance(text, str) and text.strip().startswith('<'):
+                return "Supabase returned HTML error response"
+        
+        # Check for error messages in response
+        if hasattr(response, 'error'):
+            error = response.error
+            if error:
+                error_str = str(error)
+                if '<html' in error_str.lower() or '<body' in error_str.lower():
+                    return f"Supabase HTML error: {error_str[:200]}"
+        
+        return None
+    except Exception as e:
+        logger.debug(f"[CHECK-HTML] Error checking response: {str(e)}")
+        return None
 
 
 async def get_user_profile(supabase: Client, user_id: str) -> Optional[Dict[str, Any]]:
@@ -67,11 +89,25 @@ async def get_user_profile(supabase: Client, user_id: str) -> Optional[Dict[str,
     """
     try:
         response = supabase.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+        
+        # Check for HTML error responses
+        html_error = _check_supabase_response_for_html_error(response)
+        if html_error:
+            logger.error(f"[GET-PROFILE] HTML error detected in Supabase response: {html_error}")
+            raise DatabaseError(f"Database returned HTML error instead of JSON. This may indicate a PostgREST serialization failure. Original error: {html_error}")
+        
         if response.data and len(response.data) > 0:
             return sanitize_user_profile(response.data[0])
         return None
+    except DatabaseError:
+        raise
     except Exception as e:
-        raise DatabaseError(f"Error fetching user profile: {str(e)}")
+        error_msg = str(e)
+        # Check if error message contains HTML indicators
+        if '<html' in error_msg.lower() or '<body' in error_msg.lower() or '\\r\\n' in error_msg:
+            logger.error(f"[GET-PROFILE] HTML error in exception: {error_msg[:200]}")
+            raise DatabaseError(f"Database returned HTML error instead of JSON. This may indicate a PostgREST serialization failure or RLS policy issue. Original error: {error_msg[:500]}")
+        raise DatabaseError(f"Error fetching user profile: {error_msg}")
 
 
 async def get_authenticated_user(supabase: Client, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -86,16 +122,36 @@ async def get_authenticated_user(supabase: Client, user_id: Optional[str] = None
         if user_id:
             # Get specific user by user_id
             response = supabase.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+            
+            # Check for HTML error responses
+            html_error = _check_supabase_response_for_html_error(response)
+            if html_error:
+                logger.error(f"[GET-AUTH-USER] HTML error detected: {html_error}")
+                raise DatabaseError(f"Database returned HTML error instead of JSON. Original error: {html_error}")
+            
             if response.data and len(response.data) > 0:
                 return sanitize_user_profile(response.data[0])
         else:
             # Get first user from user_profiles (for development)
             response = supabase.table("user_profiles").select("*").limit(1).execute()
+            
+            # Check for HTML error responses
+            html_error = _check_supabase_response_for_html_error(response)
+            if html_error:
+                logger.error(f"[GET-AUTH-USER] HTML error detected: {html_error}")
+                raise DatabaseError(f"Database returned HTML error instead of JSON. Original error: {html_error}")
+            
             if response.data and len(response.data) > 0:
                 return sanitize_user_profile(response.data[0])
         return None
+    except DatabaseError:
+        raise
     except Exception as e:
-        raise DatabaseError(f"Error fetching authenticated user: {str(e)}")
+        error_msg = str(e)
+        if '<html' in error_msg.lower() or '<body' in error_msg.lower() or '\\r\\n' in error_msg:
+            logger.error(f"[GET-AUTH-USER] HTML error in exception: {error_msg[:200]}")
+            raise DatabaseError(f"Database returned HTML error instead of JSON. Original error: {error_msg[:500]}")
+        raise DatabaseError(f"Error fetching authenticated user: {error_msg}")
 
 
 async def get_interview_session(supabase: Client, session_id: str) -> Dict[str, Any]:

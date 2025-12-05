@@ -10,8 +10,20 @@
 // Use getApiBase() function to get the API base URL
 // Use ensureApiBaseReady() to wait for API config to be ready
 
-// State
+// ============================================================================
+// FIX 3 & FIX 6: CRITICAL - Initialize user_id state at script start
+// We will check sessionStorage in initializeSession() to determine if it's a new session
+// ============================================================================
+// Force currentUserId to null at the very start (will be restored if valid session exists)
 let currentUserId = null;
+if (typeof window !== 'undefined') {
+    window.CURRENT_USER_ID = null;
+}
+
+// DO NOT clear sessionStorage here - let initializeSession() handle it based on session marker
+// This allows user_id to persist when navigating between pages in the same session
+
+// State (after clearing user_id)
 let currentSessionId = null;
 let currentQuestionNum = 0;
 let totalQuestions = 0;
@@ -19,121 +31,283 @@ let interviewMode = 'text';
 let timerInterval = null;
 let timeRemaining = 60;
 
+// FIX 3 & FIX 6: Session management - create session marker and preserve user_id within same session
+// Only clear user_id if it's a NEW session (no session marker exists)
+// This allows user_id to persist when navigating between pages in the same session
+function initializeSession() {
+    // Check if this is a new session (no session marker exists)
+    const sessionMarker = sessionStorage.getItem('app_session_id');
+    const existingUserId = sessionStorage.getItem('session_user_id') || sessionStorage.getItem('resume_user_id');
+    
+    if (!sessionMarker) {
+        // NEW SESSION - Clear ALL user_id data to prevent stale data from previous sessions
+        if (existingUserId) {
+            console.log('[SESSION] 🔥 NEW SESSION: Clearing stale sessionStorage user_id from previous session:', existingUserId);
+            sessionStorage.removeItem('session_user_id');
+            sessionStorage.removeItem('resume_user_id');
+        }
+        
+        // Also clear localStorage user_id
+        if (localStorage.getItem('user_id')) {
+            console.log('[SESSION] 🔥 NEW SESSION: Clearing stale localStorage user_id');
+            localStorage.removeItem('user_id');
+        }
+        
+        // Generate unique session ID for new session
+        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        sessionStorage.setItem('app_session_id', newSessionId);
+        console.log('[SESSION] ✅ New session created:', newSessionId);
+        
+        // Reset currentUserId for new session
+        currentUserId = null;
+        if (typeof window !== 'undefined') {
+            window.CURRENT_USER_ID = null;
+        }
+    } else {
+        // EXISTING SESSION - Preserve user_id if it exists (user may be returning from resume-analysis page)
+        console.log('[SESSION] ✅ Existing session marker found:', sessionMarker);
+        if (existingUserId) {
+            console.log('[SESSION] ✅ Preserving user_id from current session:', existingUserId);
+            // Restore currentUserId from sessionStorage for this session
+            currentUserId = existingUserId;
+            if (typeof window !== 'undefined') {
+                window.CURRENT_USER_ID = existingUserId;
+            }
+        } else {
+            // No user_id in existing session - reset currentUserId
+            currentUserId = null;
+            if (typeof window !== 'undefined') {
+                window.CURRENT_USER_ID = null;
+            }
+        }
+    }
+    
+    // Always clear localStorage user_id (we only use sessionStorage)
+    if (localStorage.getItem('user_id')) {
+        console.log('[SESSION] Clearing localStorage user_id (we only use sessionStorage)');
+        localStorage.removeItem('user_id');
+    }
+    
+    return sessionStorage.getItem('app_session_id');
+}
+
+// FIX 2: Validate user_id belongs to current session - STRICT validation
+// Returns false if sessionStorage is empty or userId doesn't match stored user
+function validateUserIdForSession(userId) {
+    const sessionMarker = sessionStorage.getItem('app_session_id');
+    const sessionUserId = sessionStorage.getItem('session_user_id');
+    const resumeUserId = sessionStorage.getItem('resume_user_id');
+    
+    // FIX 2: No session marker = invalid
+    if (!sessionMarker) {
+        console.log('[VALIDATE] ❌ No session marker found - user_id invalid');
+        return false;
+    }
+    
+    // FIX 2: No userId provided = invalid
+    if (!userId) {
+        console.log('[VALIDATE] ❌ No userId provided - invalid');
+        return false;
+    }
+    
+    // FIX 2: If sessionStorage has NO user_id stored, return false (prevents stale user_ids from passing)
+    // This is CRITICAL - we must have a user_id in sessionStorage that matches
+    if (!sessionUserId && !resumeUserId) {
+        console.log('[VALIDATE] ❌ No user_id in sessionStorage - stale user_id rejected:', userId);
+        return false;
+    }
+    
+    // FIX 2: user_id MUST match the stored session_user_id or resume_user_id
+    // If there's a mismatch, it's a stale user_id from a previous session
+    if (sessionUserId && sessionUserId !== userId) {
+        console.log('[VALIDATE] ❌ user_id mismatch with session:', userId, 'vs', sessionUserId);
+        return false;
+    }
+    
+    if (resumeUserId && resumeUserId !== userId) {
+        console.log('[VALIDATE] ❌ user_id mismatch with resume_user_id:', userId, 'vs', resumeUserId);
+        return false;
+    }
+    
+    // Only return true if userId matches the stored user_id in sessionStorage
+    console.log('[VALIDATE] ✅ user_id validated:', userId);
+    return true;
+}
+
+// BUG FIX #1 & #4: Store user_id with session marker
+function storeUserIdWithSession(userId) {
+    if (!userId) return;
+    
+    const sessionMarker = sessionStorage.getItem('app_session_id');
+    if (!sessionMarker) {
+        // Create session if it doesn't exist
+        initializeSession();
+    }
+    
+    // CRITICAL FIX: ONLY store in sessionStorage - NEVER localStorage
+    // localStorage persists across sessions and causes stale data (e.g., haripriya-chintagunti)
+    // We ONLY use sessionStorage which is session-scoped and cleared on new sessions
+    sessionStorage.setItem('session_user_id', userId);
+    sessionStorage.setItem('resume_user_id', userId);
+    
+    console.log('[SESSION] Stored user_id in sessionStorage only (session-scoped):', userId);
+}
+
+// BUG FIX #1 & #4: Clear user_id and session data
+function clearUserSession() {
+    localStorage.removeItem('user_id');
+    sessionStorage.removeItem('session_user_id');
+    sessionStorage.removeItem('resume_user_id');
+    currentUserId = null;
+    window.CURRENT_USER_ID = null;
+    console.log('[SESSION] Cleared user session data');
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // BUG FIX #1 & #4: Initialize session first
+    initializeSession();
     init();
 });
 
-// Also reload profile when page becomes visible (user returns from resume analysis page)
+// FIX 4: visibilitychange handler - MUST do nothing if currentUserId is null
+// This prevents dashboard/profile loads on initial page load
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        // Check if we have a user_id and reload profile
-        const userId = currentUserId || window.CURRENT_USER_ID || 
-                      localStorage.getItem('user_id') || 
-                      sessionStorage.getItem('resume_user_id');
-        if (userId) {
-            loadProfile();
+        // FIX 4: Only reload if currentUserId exists AND was set in THIS page load (after resume upload)
+        // If currentUserId is null, do NOTHING (prevents loading stale data on initial page load)
+        if (!currentUserId) {
+            console.log('[VISIBILITY] ❌ BLOCKED: No currentUserId - skipping reload (user must upload resume first)');
+            return; // Exit early - do nothing
         }
+        
+        // FIX 2: Validate user_id belongs to current session before reloading
+        if (!validateUserIdForSession(currentUserId)) {
+            console.log('[VISIBILITY] ❌ BLOCKED: Invalid user_id - skipping reload');
+            clearUserSession();
+            return; // Exit early - do nothing
+        }
+        
+        // Only reload if we have a valid, session-scoped user_id
+        console.log('[VISIBILITY] ✅ Valid user_id found (from resume upload) - reloading profile and dashboard');
+        loadProfile();
+        loadDashboard();
     }
 });
 
-// Get current authenticated user from user_profiles (optional - won't fail if no user exists)
+// FIX 1: Get current authenticated user - ONLY called after resume upload
+// This function MUST NOT be called automatically on page load
+// It will ONLY be called after a successful resume upload sets a user_id
 async function getCurrentUser() {
+    // FIX 1: Block execution if no user_id exists (prevents automatic calls on page load)
+    if (!currentUserId) {
+        console.log('[AUTH] ❌ BLOCKED: getCurrentUser() called without currentUserId - no API call made');
+        return null;
+    }
+    
     try {
-        const res = await fetch(`${getApiBase()}/api/profile/current`);
+        // FIX 2: Validate user_id belongs to current session before making API call
+        if (!validateUserIdForSession(currentUserId)) {
+            console.log('[AUTH] ❌ user_id does not belong to current session, clearing stale data');
+            clearUserSession();
+            return null;
+        }
+        
+        // FIX 5: Pass session_id to backend for validation
+        const sessionMarker = sessionStorage.getItem('app_session_id');
+        const apiBase = getApiBase();
+        const sessionParam = sessionMarker ? `&session_id=${encodeURIComponent(sessionMarker)}` : '';
+        const res = await fetch(`${apiBase}/api/profile/current?user_id=${encodeURIComponent(currentUserId)}${sessionParam}`, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        });
+        
         if (!res.ok) {
             if (res.status === 404) {
-                // No user found - this is OK for new users
-                console.log('No existing user profile found - new user can upload resume');
+                // Profile not found for this user_id - user needs to upload resume
+                console.log(`[AUTH] Profile not found for user_id: ${currentUserId} - user needs to upload resume`);
+                clearUserSession();
                 return null;
             }
             throw new Error(`Failed to get current user: ${res.status}`);
         }
-        const user = await res.json();
-        currentUserId = user.user_id;
-        window.CURRENT_USER_ID = currentUserId; // Store globally for other scripts
         
-        // Store in localStorage for persistence
-        if (currentUserId) {
-            localStorage.setItem('user_id', currentUserId);
-            sessionStorage.setItem('resume_user_id', currentUserId);
+        const user = await res.json();
+        
+        // CRITICAL: Verify the returned user_id matches the requested user_id
+        if (user.user_id !== currentUserId) {
+            console.error(`[AUTH] ❌ SECURITY: User ID mismatch! Requested: ${currentUserId}, Received: ${user.user_id}`);
+            clearUserSession();
+            throw new Error('User ID mismatch - received wrong user profile');
         }
         
-        console.log('Current user found:', currentUserId);
+        console.log('[AUTH] Current authenticated user:', currentUserId);
         return user;
     } catch (e) {
         // Network error or other issue - don't throw, just log
-        console.log('Could not fetch current user (this is OK for new users):', e.message);
+        console.error('[AUTH] Error fetching current user:', e.message);
         return null;
     }
 }
 
+// FIX 4 & FIX 5: Initialize app - load profile/dashboard if valid user_id exists in current session
 async function init() {
-    console.log('Initializing app...');
+    console.log('[INIT] Initializing app...');
+    
     // Always set up event listeners first - this is critical for upload to work
     // Use setTimeout to ensure DOM is fully ready
     setTimeout(() => {
-        console.log('Setting up event listeners after DOM ready...');
+        console.log('[INIT] Setting up event listeners after DOM ready...');
         setupEventListeners();
     }, 100);
     
-    try {
-        // Try to get current authenticated user (optional - don't fail if no user exists)
-        const user = await getCurrentUser();
-        if (user && currentUserId) {
-            console.log('User found from API, loading profile and dashboard');
-            // Load profile if user exists
-            loadProfile();
-            // Load dashboard if user exists
-            loadDashboard();
-        } else {
-            console.log('No user found from API - checking storage for user_id');
-            // Get user_id from storage (backend generates it from resume name)
-            // DO NOT generate UUID - wait for backend to create user_id from resume
-            if (!currentUserId && !window.CURRENT_USER_ID) {
-                const storedUserId = localStorage.getItem('user_id') || sessionStorage.getItem('resume_user_id');
-                if (storedUserId) {
-                    currentUserId = storedUserId;
-                    window.CURRENT_USER_ID = storedUserId;
-                } else {
-                    console.log('No user_id in storage yet. User needs to upload resume first.');
-                }
-            }
-            
-            // Always try to load profile - loadProfile() will handle the case when there's no user_id
-            // It will show appropriate message or fetch profile if user_id exists
-            loadProfile();
-            // Also try to load dashboard if we have a user_id
-            if (currentUserId || window.CURRENT_USER_ID) {
-                loadDashboard();
-            }
-        }
-    } catch (e) {
-        console.error('Initialization error:', e);
-        // Don't block the UI - still allow upload
-        // Get user_id from storage (backend generates it from resume name)
-        // DO NOT generate UUID - wait for backend to create user_id from resume
-        if (!currentUserId && !window.CURRENT_USER_ID) {
-            const storedUserId = localStorage.getItem('user_id') || sessionStorage.getItem('resume_user_id');
-            if (storedUserId) {
-                currentUserId = storedUserId;
-                window.CURRENT_USER_ID = storedUserId;
-                console.log('Retrieved user_id from storage after error:', storedUserId);
-            } else {
-                console.log('No user_id in storage. User needs to upload resume first.');
-            }
+    // FIX 4 & FIX 5: Check if we have a valid user_id from current session (set after resume upload)
+    // initializeSession() preserves user_id if it belongs to the current session
+    // If user_id exists and is valid, load profile and dashboard
+    const sessionUserId = sessionStorage.getItem('session_user_id') || sessionStorage.getItem('resume_user_id');
+    
+    if (sessionUserId && validateUserIdForSession(sessionUserId)) {
+        // Valid user_id found in current session - restore it and load data
+        console.log('[INIT] ✅ Valid user_id found in current session:', sessionUserId);
+        currentUserId = sessionUserId;
+        if (typeof window !== 'undefined') {
+            window.CURRENT_USER_ID = sessionUserId;
         }
         
-        // Always try to load profile even after error - loadProfile() handles errors gracefully
-        loadProfile();
-        // Also try to load dashboard if we have a user_id
-        if (currentUserId || window.CURRENT_USER_ID) {
-            loadDashboard();
+        // FIX 4 & FIX 5: Load profile and dashboard with the valid user_id
+        console.log('[INIT] ✅ Loading profile and dashboard for user:', sessionUserId);
+        await loadProfile();
+        await loadDashboard();
+            } else {
+        // No valid user_id - show empty state
+        console.log('[INIT] ❌ No valid user_id found - showing empty state. User must upload resume first.');
+        const profileContent = document.getElementById('profileContent');
+        if (profileContent) {
+            profileContent.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No profile found yet. Upload your resume below to create your profile and get started!</p>';
+        }
+        
+        // Clear any invalid user_id
+        if (sessionUserId) {
+            console.log('[INIT] ❌ Invalid user_id detected, clearing:', sessionUserId);
+            clearUserSession();
         }
     }
 }
 
+// CRITICAL: Track if event listeners are already attached to prevent duplicates
+let eventListenersAttached = false;
+
 function setupEventListeners() {
+    // CRITICAL FIX: Prevent duplicate event listeners
+    // If listeners are already attached, don't attach them again
+    if (eventListenersAttached) {
+        console.log('[SETUP] Event listeners already attached, skipping to prevent duplicates');
+        return;
+    }
+    
     // File upload - check if elements exist before attaching listeners
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
@@ -145,72 +319,112 @@ function setupEventListeners() {
     console.log('uploadArea found:', !!uploadArea);
 
     if (fileInput && uploadBtn) {
+        // CRITICAL DIAGNOSTIC: Check for duplicate elements in DOM
+        const allFileInputs = document.querySelectorAll('input[type="file"][id="fileInput"]');
+        const allLabels = document.querySelectorAll('label[for="fileInput"]');
+        console.log('[DIAG] Total fileInput elements in DOM:', allFileInputs.length);
+        console.log('[DIAG] Total labels with for="fileInput" in DOM:', allLabels.length);
+        
+        if (allFileInputs.length > 1) {
+            console.error('[DIAG] ❌ DUPLICATE FILE INPUT ELEMENTS DETECTED! Removing duplicates.');
+            // Remove duplicates, keep only the first one
+            for (let i = 1; i < allFileInputs.length; i++) {
+                console.log('[DIAG] Removing duplicate fileInput #' + i);
+                allFileInputs[i].remove();
+            }
+            // Re-get the fileInput after removing duplicates
+            const fileInput = document.getElementById('fileInput');
+        }
+        
+        if (allLabels.length > 1) {
+            console.error('[DIAG] ❌ DUPLICATE LABELS DETECTED! Removing duplicates.');
+            // Remove duplicates, keep only the first one
+            for (let i = 1; i < allLabels.length; i++) {
+                console.log('[DIAG] Removing duplicate label #' + i);
+                allLabels[i].remove();
+            }
+            // Re-get the uploadBtn after removing duplicates
+            const uploadBtn = document.getElementById('uploadBtn');
+        }
+        
         // Ensure file input is accessible and not disabled
-        if (fileInput) {
             fileInput.disabled = false;
             fileInput.removeAttribute('disabled');
             fileInput.style.display = 'none'; // Hide but keep accessible
-            console.log('File input is ready, disabled:', fileInput.disabled);
-        }
+        console.log('[DIAG] File input is ready, disabled:', fileInput.disabled);
         
-        // Ensure file input is always ready
-        fileInput.disabled = false;
-        fileInput.style.display = 'none';
+        // CRITICAL FIX: Label's for="fileInput" automatically triggers fileInput when clicked
+        // Do NOT add any event listener to uploadBtn - it interferes with label's native behavior
+        // The label's for="fileInput" attribute handles the click automatically
+        console.log('[DIAG] Upload button uses label\'s native for="fileInput" behavior (no event listener)');
         
-        // Label will automatically trigger fileInput when clicked (via for="fileInput")
-        // But add explicit handler as backup
-        uploadBtn.addEventListener('click', function(e) {
-            if (!fileInput) {
-                alert('File upload element not found. Please refresh the page.');
+        // CRITICAL FIX: Prevent file input from being triggered multiple times
+        // Use a flag to block rapid successive clicks
+        let fileInputClickBlocked = false;
+        
+        // CRITICAL FIX: Override fileInput.click() to prevent double triggers
+        const originalClick = fileInput.click.bind(fileInput);
+        fileInput.click = function() {
+            if (fileInputClickBlocked) {
+                console.log('[DIAG] fileInput.click() blocked - already triggered recently');
                 return;
             }
-            
-            // Ensure file input is enabled
-            fileInput.disabled = false;
-            
-            // If label's natural behavior doesn't work, trigger manually
+            fileInputClickBlocked = true;
+            console.log('[DIAG] fileInput.click() called - allowing');
+            originalClick();
+            // Unblock after a short delay to allow file selection
             setTimeout(() => {
-                if (fileInput) {
-                    fileInput.click();
-                }
-            }, 0);
-        });
+                fileInputClickBlocked = false;
+            }, 1000);
+        };
         
-        console.log('Upload button event listener attached');
-        
-        // File input change handler
-        fileInput.addEventListener('change', function(e) {
-            console.log('=== FILE INPUT CHANGED ===');
-            console.log('Files:', e.target.files);
-            console.log('File count:', e.target.files ? e.target.files.length : 0);
+        // CRITICAL FIX: Define change handler as named function stored globally
+        // This allows us to check if it's already attached and prevent duplicates
+        if (!window.handleFileInputChange) {
+            window.handleFileInputChange = function(e) {
+                console.log('[DIAG] === FILE INPUT CHANGED EVENT FIRED ===');
+                console.log('[DIAG] Event target:', e.target);
+                console.log('[DIAG] Event target ID:', e.target.id);
+                console.log('[DIAG] Files:', e.target.files);
+                console.log('[DIAG] File count:', e.target.files ? e.target.files.length : 0);
+                
+                // Unblock immediately when file is selected
+                fileInputClickBlocked = false;
             
             if (e.target.files && e.target.files.length > 0) {
                 const selectedFile = e.target.files[0];
-                console.log('File selected:', {
+                    console.log('[DIAG] File selected:', {
                     name: selectedFile.name,
                     size: selectedFile.size,
                     type: selectedFile.type
                 });
-                console.log('Calling handleFileUpload...');
+                    console.log('[DIAG] Calling handleFileUpload...');
                 handleFileUpload(e);
             } else {
-                console.warn('No files selected - user may have cancelled');
-            }
-        });
-        
-        console.log('File input change listener attached');
-        
-        // Also allow direct click on upload area (but not on button)
-        if (uploadArea) {
-            uploadArea.addEventListener('click', function(e) {
-                // Only trigger if clicking on the area itself, not on the button
-                if (e.target === uploadArea || (e.target.closest && e.target.closest('#uploadContent') && e.target !== uploadBtn)) {
-                    if (fileInput && !fileInput.disabled) {
-                        fileInput.click();
-                    }
+                    console.warn('[DIAG] No files selected - user may have cancelled');
                 }
-            });
+            };
         }
+        
+        // CRITICAL FIX: Check if change listener is already attached using data attribute
+        // This prevents duplicate listeners without breaking the label's for="fileInput" binding
+        if (!fileInput.hasAttribute('data-change-listener-attached')) {
+            fileInput.addEventListener('change', window.handleFileInputChange);
+            fileInput.setAttribute('data-change-listener-attached', 'true');
+            console.log('[DIAG] File input change listener attached (first time)');
+        } else {
+            console.log('[DIAG] File input change listener already attached, skipping duplicate');
+        }
+        
+        // CRITICAL FIX: Do NOT attach any click handler to uploadArea
+        // The label's for="fileInput" handles button clicks automatically via native browser behavior
+        // Any click handler on uploadArea can interfere with label's native behavior and cause double triggers
+        // The label's native behavior is sufficient - no JavaScript click handler needed
+        console.log('[SETUP] Upload area click handler NOT attached - relying on label\'s native for="fileInput" behavior');
+        
+        // Mark listeners as attached
+        eventListenersAttached = true;
+        console.log('[SETUP] Event listeners attached successfully');
     } else {
         console.error('File upload elements not found. Required IDs: fileInput, uploadBtn');
         if (!fileInput) console.error('Missing: #fileInput');
@@ -254,6 +468,7 @@ function setupEventListeners() {
     }
 }
 
+// FIX 1 & FIX 6: loadProfile - ONLY runs after resume upload sets currentUserId
 async function loadProfile() {
     const content = document.getElementById('profileContent');
     if (!content) {
@@ -261,41 +476,42 @@ async function loadProfile() {
         return;
     }
 
+    // FIX 1 & FIX 6: ONLY use currentUserId set after resume upload - NEVER read from storage
+    // sessionStorage is cleared on every page load, so we only use currentUserId from this page load
+    const userId = currentUserId; // Only use local variable set after resume upload
+
+    // FIX 1 & FIX 6: If no user_id found, show empty state and return immediately - BLOCK API CALLS
+    if (!userId) {
+        console.log('[PROFILE] ❌ BLOCKED: No user_id found - showing empty state. User must upload resume first.');
+        content.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No profile found yet. Upload your resume below to create your profile and get started!</p>';
+        return; // Exit early - no API calls
+    }
+
+    // FIX 2: Validate user_id belongs to current session BEFORE making API call
+    if (!validateUserIdForSession(userId)) {
+        console.log('[PROFILE] ❌ BLOCKED: user_id does not belong to current session, clearing stale data');
+        clearUserSession();
+        content.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No profile found yet. Upload your resume below to create your profile and get started!</p>';
+        return; // Exit early - no API calls
+    }
+
     // Ensure API_BASE is configured before making requests
     await ensureApiBaseReady();
 
-    // Try to get user_id from multiple sources
-    let userId = currentUserId || window.CURRENT_USER_ID;
-    
-    // If not in global variable, try storage
-    if (!userId) {
-        userId = localStorage.getItem('user_id') || sessionStorage.getItem('resume_user_id');
-        if (userId) {
-            currentUserId = userId;
-            window.CURRENT_USER_ID = userId;
-        }
-    }
+    // FIX 2 & FIX 3: Always fetch fresh profile data from server (no cache)
+    console.log('[PROFILE] ✅ Loading fresh profile data from server (no cache)');
 
-    // If still no user_id, try to get from API
-    if (!userId) {
-        try {
-            const user = await getCurrentUser();
-            if (user && user.user_id) {
-                userId = user.user_id;
-                currentUserId = userId;
-                window.CURRENT_USER_ID = userId;
-            }
-        } catch (e) {
-            console.log('Could not get current user:', e.message);
-        }
-    }
-
-    // If we have a user_id, fetch the profile
-    if (userId) {
+    // FIX 2: Only fetch profile if user_id is valid for current session (already validated above)
         try {
             // Ensure API_BASE is set before making request
             const apiBase = getApiBase();
-            const profileUrl = `${apiBase}/api/profile/${userId}`;
+        // BUG FIX #2: Add cache-busting parameter and session_id for validation
+        const timestamp = Date.now();
+        const sessionMarker = sessionStorage.getItem('app_session_id');
+        const sessionParam = sessionMarker ? `&session_id=${encodeURIComponent(sessionMarker)}` : '';
+        const profileUrl = `${apiBase}/api/profile/${userId}?_t=${timestamp}${sessionParam}`;
+        
+        console.log('[PROFILE] Fetching profile from:', profileUrl);
             
             // Make request with timeout and better error handling
             const controller = new AbortController();
@@ -303,14 +519,19 @@ async function loadProfile() {
             
             let res;
             try {
+            // BUG FIX #2: Ensure no caching at all levels
                 res = await fetch(profileUrl, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
                     },
                     signal: controller.signal,
                     mode: 'cors', // Explicitly set CORS mode
-                    credentials: 'omit' // Don't send credentials for CORS
+                credentials: 'omit', // Don't send credentials for CORS
+                cache: 'no-store' // Ensure no caching
                 });
                 clearTimeout(timeoutId);
             } catch (fetchError) {
@@ -325,7 +546,6 @@ async function loadProfile() {
                     throw new Error(`Network error: ${fetchError.message}`);
                 }
             }
-            
             
             if (res.status === 404) {
                 content.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No profile found. Upload a resume to create your profile.</p>';
@@ -354,8 +574,14 @@ async function loadProfile() {
             }
             
             const profile = await res.json();
+        console.log('[PROFILE] Fresh profile data received:', {
+            name: profile.name,
+            email: profile.email,
+            experience: profile.experience_level,
+            skills_count: profile.skills?.length || 0,
+            has_resume: !!(profile.resume_url || profile.resume_text)
+        });
             displayProfile(profile);
-            return;
         } catch (e) {
             console.error('[PROFILE] Error loading profile:', e);
             console.error('[PROFILE] Error name:', e.name);
@@ -375,25 +601,26 @@ async function loadProfile() {
             }
             
             content.innerHTML = `<p style="color: #999; padding: 20px; text-align: center;">Unable to load profile: ${errorMsg}. <br><small>Check browser console (F12) for more details.</small></p>`;
-            return;
         }
-    }
-
-    // No user_id available - show message to upload resume
-    content.innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No profile found yet. Upload your resume below to create your profile and get started!</p>';
 }
 
 function displayProfile(profile) {
+    // CRITICAL: Display only resume-extracted data
+    // Show empty values if no resume uploaded (no hard-coded defaults)
     const skills = profile.skills || [];
     const skillsHtml = skills.length > 0
         ? skills.map(s => `<span class="skill-tag">${s}</span>`).join('')
-        : '<p style="color: #999; font-size: 13px;">No skills yet. Upload your resume.</p>';
+        : '<p style="color: #999; font-size: 13px;">No skills extracted from resume yet.</p>';
 
+    // Check if profile has resume data
+    const hasResumeData = profile.resume_url || profile.resume_text;
+    
+    // Display profile data - show empty/not set if no resume uploaded
     document.getElementById('profileContent').innerHTML = `
         <div style="display: grid; gap: 15px;">
-            <div><strong>Name:</strong> ${profile.name || 'Not set'}</div>
-            <div><strong>Email:</strong> ${profile.email || 'Not set'}</div>
-            <div><strong>Experience:</strong> ${profile.experience_level || 'Not set'}</div>
+            <div><strong>Name:</strong> ${profile.name || (hasResumeData ? 'Not extracted' : 'Not set - upload resume')}</div>
+            <div><strong>Email:</strong> ${profile.email || (hasResumeData ? 'Not extracted' : 'Not set - upload resume')}</div>
+            <div><strong>Experience:</strong> ${profile.experience_level || (hasResumeData ? 'Not extracted' : 'Not set - upload resume')}</div>
             <div>
                 <strong>Skills:</strong>
                 <div class="skills-list" style="margin-top: 8px;">${skillsHtml}</div>
@@ -446,10 +673,11 @@ async function handleFileUpload(e) {
     if (uploadContent) uploadContent.classList.add('hidden');
     if (uploadScanning) uploadScanning.classList.remove('hidden');
 
-    // Get user ID from storage (backend generates it from resume name)
-    // DO NOT generate UUID - backend creates stable user_id from name
-    let userId = currentUserId || window.CURRENT_USER_ID || 
-                 localStorage.getItem('user_id') || 
+    // CRITICAL FIX: ONLY use sessionStorage - NEVER localStorage or window.CURRENT_USER_ID (contains stale data)
+    // window.CURRENT_USER_ID can persist across page reloads and contain old user data
+    // Backend generates user_id from resume name
+    let userId = currentUserId || 
+                 sessionStorage.getItem('session_user_id') ||
                  sessionStorage.getItem('resume_user_id');
     
     if (!userId) {
@@ -524,7 +752,8 @@ async function handleFileUpload(e) {
         // Store analysis data in sessionStorage (including errors)
         sessionStorage.setItem('resume_analysis_data', JSON.stringify(data));
         sessionStorage.setItem('resume_analysis_session', sessionId);
-        // Store stable user_id from backend response (generated from name)
+        
+        // BUG FIX #1 & #4: Store stable user_id from backend response with session marker
         // Note: user_id may be null for error responses, which is OK
         const stableUserId = data.user_id;
         if (data.success === true && !stableUserId) {
@@ -533,19 +762,23 @@ async function handleFileUpload(e) {
         }
         // For error responses, user_id can be null - don't throw
         
-        // Store in both localStorage (persistent) and sessionStorage (session)
+        // BUG FIX #1 & #4: Store user_id with session marker (only after successful upload)
         // Only store user_id if it exists (not for error responses)
         if (stableUserId) {
-            localStorage.setItem('user_id', stableUserId);
-            sessionStorage.setItem('resume_user_id', stableUserId);
+            storeUserIdWithSession(stableUserId);
             
             // Update global user_id
             currentUserId = stableUserId;
             window.CURRENT_USER_ID = stableUserId;
+            
+            // CRITICAL: Clear any cached profile data to force fresh fetch
+            // This ensures the profile section shows the newly uploaded resume data
+            sessionStorage.removeItem('cached_profile_data');
+            localStorage.removeItem('cached_profile_data');
         }
         
-        console.log('Stored stable user_id from backend:', stableUserId);
-        console.log('Saved to localStorage and sessionStorage');
+        console.log('Stored stable user_id from backend with session:', stableUserId);
+        console.log('Cleared cached profile data to force fresh fetch');
         
         console.log('Stored in sessionStorage:', {
             session_id: sessionId,
@@ -777,19 +1010,46 @@ function endInterview(completed = false) {
     }
 }
 
+// FIX 1 & FIX 6: loadDashboard - ONLY runs after resume upload sets currentUserId
 async function loadDashboard() {
-    if (!currentUserId) {
-        // Try to get user, but don't fail if not found
-        const user = await getCurrentUser();
-        if (!user || !currentUserId) {
-            // No user found - this is OK, don't show error
-            return;
-        }
+    // FIX 1 & FIX 6: ONLY use currentUserId set after resume upload - NEVER read from storage
+    // sessionStorage is cleared on every page load, so we only use currentUserId from this page load
+    const userId = currentUserId; // Only use local variable set after resume upload
+    
+    // FIX 1 & FIX 6: If no user_id found, return immediately - BLOCK API CALLS
+    if (!userId) {
+        console.log('[DASHBOARD] ❌ BLOCKED: No user_id found - skipping dashboard load. User must upload resume first.');
+        return; // Exit early - no API calls
     }
-    const userId = currentUserId;
+    
+    // FIX 2: Validate user_id belongs to current session BEFORE making API call
+    if (!validateUserIdForSession(userId)) {
+        console.log('[DASHBOARD] ❌ BLOCKED: user_id does not belong to current session, clearing stale data');
+        clearUserSession();
+        return; // Exit early - no API calls
+    }
+    
+    // BUG FIX #6: Reload profile data when dashboard loads
+    // This ensures profile section shows fresh resume data after interviews
+    // Uses the authenticated user's user_id from session storage
+    console.log('[DASHBOARD] Reloading profile data for authenticated user:', userId);
+    loadProfile();
 
     try {
-        const res = await fetch(`${getApiBase()}/api/dashboard/performance/${userId}`);
+        // BUG FIX #2: Add cache-busting and ensure no caching
+        const timestamp = Date.now();
+        const sessionMarker = sessionStorage.getItem('app_session_id');
+        const sessionParam = sessionMarker ? `&session_id=${encodeURIComponent(sessionMarker)}` : '';
+        const dashboardUrl = `${getApiBase()}/api/dashboard/performance/${userId}?_t=${timestamp}${sessionParam}`;
+        
+        const res = await fetch(dashboardUrl, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
         const data = await res.json();
 
         // Update Total Interviews

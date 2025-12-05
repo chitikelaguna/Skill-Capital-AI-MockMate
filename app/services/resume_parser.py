@@ -122,8 +122,7 @@ class ResumeParser:
                     return text
         except ImportError:
             raise Exception(
-                "PDF parsing libraries not available. Please install one of: "
-                "pip install pymupdf OR pip install pdfplumber"
+                "PDF parsing libraries not available. Please install dependencies: pip install -r requirements.txt"
             )
         except Exception as e:
             error_msg = str(e)
@@ -145,7 +144,7 @@ class ResumeParser:
         
         
         if not DOCX_AVAILABLE:
-            raise Exception("python-docx is not available. Please install it with: pip install python-docx")
+            raise Exception("python-docx is not available. Please install dependencies: pip install -r requirements.txt")
         
         try:
             doc = Document(file_path)

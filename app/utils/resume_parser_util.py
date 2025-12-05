@@ -44,110 +44,6 @@ try:
 except ImportError:
     pass
 
-# OCR Libraries
-OCR_AVAILABLE = False
-TESSERACT_PATH = None
-
-def configure_tesseract():
-    """
-    Automatically detect and configure Tesseract OCR path based on the operating system.
-    Supports Windows, Linux, and macOS.
-    
-    Returns:
-        bool: True if Tesseract is configured and available, False otherwise
-    """
-    global OCR_AVAILABLE, TESSERACT_PATH
-    
-    try:
-        import pytesseract
-    except ImportError:
-        logger.warning("[RESUME_PARSER] pytesseract not installed. OCR fallback will not be available.")
-        logger.warning("[RESUME_PARSER] Install with: pip install pytesseract")
-        OCR_AVAILABLE = False
-        return False
-    
-    system = platform.system()
-    paths = {
-        "Windows": [
-            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-            os.path.expanduser(r"~\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
-        ],
-        "Linux": [
-            "/usr/bin/tesseract",
-            "/usr/local/bin/tesseract",
-        ],
-        "Darwin": [  # macOS
-            "/opt/homebrew/bin/tesseract",
-            "/usr/local/bin/tesseract",
-            "/opt/local/bin/tesseract",  # MacPorts
-        ]
-    }
-    
-    possible_paths = paths.get(system, [])
-    
-    # Try to find Tesseract in common paths
-    tesseract_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            tesseract_path = path
-            pytesseract.pytesseract.tesseract_cmd = path
-            TESSERACT_PATH = path
-            logger.info(f"[TESSERACT] Configured path: {path}")
-            break
-    
-    # If not found in common paths, try to use system PATH
-    if not tesseract_path:
-        try:
-            # This will raise an exception if Tesseract is not in PATH
-            pytesseract.get_tesseract_version()
-            # If we get here, Tesseract is in PATH
-            logger.info("[TESSERACT] Found Tesseract in system PATH")
-            OCR_AVAILABLE = True
-            return True
-        except Exception:
-            # Tesseract not found in PATH either
-            pass
-    
-    # Test if Tesseract is available at configured path
-    if tesseract_path:
-        try:
-            pytesseract.get_tesseract_version()
-            OCR_AVAILABLE = True
-            logger.info("[RESUME_PARSER] OCR enabled and ready.")
-            return True
-        except Exception as e:
-            logger.error(f"[TESSERACT] Tesseract found at {tesseract_path} but failed to initialize: {str(e)}")
-            OCR_AVAILABLE = False
-            return False
-    else:
-        # Tesseract not found
-        install_url = "https://github.com/UB-Mannheim/tesseract/wiki"
-        if system == "Windows":
-            logger.warning(f"[TESSERACT] OCR engine not found for {system}. Please install it from: {install_url}")
-        elif system == "Linux":
-            logger.warning(f"[TESSERACT] OCR engine not found for {system}. Install with: sudo apt-get install tesseract-ocr")
-        elif system == "Darwin":
-            logger.warning(f"[TESSERACT] OCR engine not found for {system}. Install with: brew install tesseract")
-        else:
-            logger.warning(f"[TESSERACT] OCR engine not found for {system}. Please install Tesseract OCR manually.")
-        OCR_AVAILABLE = False
-        return False
-
-# Initialize OCR libraries
-try:
-    import pytesseract
-    from pdf2image import convert_from_path
-    from PIL import Image
-    
-    # Configure Tesseract automatically
-    configure_tesseract()
-except ImportError:
-    OCR_AVAILABLE = False
-    logger.warning("[RESUME_PARSER] OCR libraries not installed. OCR fallback will not be available.")
-    logger.warning("[RESUME_PARSER] Install with: pip install pytesseract pdf2image pillow")
-
-
 def is_text_meaningful(text: str, min_length: int = 20) -> bool:
     """
     Check if extracted text is meaningful (not just metadata/page numbers).
@@ -205,65 +101,13 @@ def is_text_meaningful(text: str, min_length: int = 20) -> bool:
     return False
 
 
-def extract_text_with_ocr(pdf_path: str) -> Optional[str]:
-    """
-    Extract text using OCR for PDFs without selectable text layer.
-    Useful for LaTeX-generated PDFs, scanned documents, or image-based PDFs.
-    """
-    if not OCR_AVAILABLE:
-        logger.warning("[OCR Parser] OCR not available - skipping OCR extraction")
-        return None
-    
-    try:
-        logger.info("[OCR Parser] Starting OCR extraction...")
-        
-        # Check if poppler is available (required for pdf2image)
-        try:
-            # Convert PDF pages to images
-            images = convert_from_path(pdf_path, dpi=300)  # Higher DPI for better accuracy
-            logger.info(f"[OCR Parser] Converted PDF to {len(images)} image(s)")
-        except Exception as poppler_error:
-            error_msg = str(poppler_error).lower()
-            if "poppler" in error_msg or "pdftoppm" in error_msg:
-                logger.error("[OCR Parser] Poppler not installed. On Windows, download from: https://github.com/oschwartz10612/poppler-windows/releases/")
-                logger.error("[OCR Parser] On Linux: sudo apt-get install poppler-utils")
-                logger.error("[OCR Parser] On macOS: brew install poppler")
-            raise
-        
-        text_parts = []
-        for page_num, page_image in enumerate(images):
-            try:
-                # Perform OCR on each page
-                page_text = pytesseract.image_to_string(page_image, lang='eng')
-                if page_text and page_text.strip():
-                    text_parts.append(page_text.strip())
-                    logger.info(f"[OCR Parser] Extracted {len(page_text)} chars from page {page_num + 1}")
-            except Exception as page_error:
-                logger.warning(f"[OCR Parser] Failed to OCR page {page_num + 1}: {str(page_error)}")
-                continue
-        
-        if text_parts:
-            full_text = "\n\n".join(text_parts)
-            logger.info(f"[OCR Parser] OCR SUCCESS - Extracted {len(full_text)} characters total")
-            return full_text
-        else:
-            logger.warning("[OCR Parser] OCR completed but no text was extracted")
-            return None
-            
-    except Exception as e:
-        logger.error(f"[OCR Parser] OCR extraction failed: {str(e)}")
-        return None
-
-
-def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
+def parse_pdf(file_path: str, use_ocr_fallback: bool = False) -> Dict[str, Any]:
     """
     Parse PDF file with multiple fallback libraries
     Returns structured data with name, email, skills, experience
     
-    Improved to better handle LaTeX-generated PDFs by:
-    1. Checking if extracted text is meaningful (not just metadata)
-    2. Automatically trying OCR if text is not meaningful
-    3. Better error messages for LaTeX PDFs
+    Uses PyMuPDF and pdfplumber for text extraction.
+    Note: OCR support has been removed. For LaTeX PDFs, please export as PDF/A.
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"PDF file not found: {file_path}")
@@ -281,7 +125,7 @@ def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
     logger.info(f"[RESUME_PARSER] Available PDF parsers: {', '.join(available_parsers) if available_parsers else 'NONE'}")
     
     if not available_parsers:
-        raise ImportError("No PDF parsing libraries are installed. Please install: pip install PyMuPDF pdfplumber")
+        raise ImportError("No PDF parsing libraries are installed. Please install dependencies: pip install -r requirements.txt")
     
     text = None
     parser_used = None
@@ -360,48 +204,20 @@ def parse_pdf(file_path: str, use_ocr_fallback: bool = True) -> Dict[str, Any]:
                 if not parser_used:
                     parser_used = "PyMuPDF"  # Default to first parser used
         
-        # Final validation - try OCR if no meaningful text was extracted
-        if not text or not text_is_meaningful:
-            if use_ocr_fallback:
-                if OCR_AVAILABLE:
-                    logger.info("[RESUME_PARSER] LaTeX-based PDF detected - running OCR to extract text...")
-                    logger.info("[RESUME_PARSER] No meaningful text extracted with standard parsers. Attempting OCR fallback...")
-                    ocr_text = extract_text_with_ocr(file_path)
-                    if ocr_text and is_text_meaningful(ocr_text, min_length=20):
-                        text = ocr_text
-                        parser_used = "OCR (Tesseract)"
-                        text_is_meaningful = True
-                        logger.info(f"[RESUME_PARSER] OCR fallback SUCCESS - Extracted {len(text)} meaningful characters")
-                    else:
-                        logger.warning("[RESUME_PARSER] OCR fallback also failed to extract meaningful text")
-                else:
-                    logger.warning("[RESUME_PARSER] LaTeX-based PDF detected but OCR fallback requested - Tesseract OCR is not installed. This PDF requires OCR.")
-        
-        # If still no meaningful text after OCR, raise error
+        # If still no meaningful text, raise error
         if not text or not text_is_meaningful:
             error_details = []
             if not available_parsers:
                 error_details.append("No parsing libraries available")
             else:
-                error_details.append(f"All parsers failed (tried: {', '.join(available_parsers)}")
-                if use_ocr_fallback:
-                    if OCR_AVAILABLE:
-                        error_details.append("OCR fallback attempted")
-                    else:
-                        error_details.append("OCR fallback not available - Tesseract not installed")
-                error_details.append(")")
+                error_details.append(f"All parsers failed (tried: {', '.join(available_parsers)})")
             if last_error:
                 error_details.append(f"Last error: {last_error}")
             
             logger.warning(f"[RESUME_PARSER] FAILED - No meaningful text found. {'. '.join(error_details)}")
             
-            # Provide more specific error message for LaTeX/vector PDFs
-            if use_ocr_fallback and not OCR_AVAILABLE:
-                raise ValueError("LATEX_PDF_OCR_REQUIRED: LaTeX-based PDF detected - could not extract meaningful text from PDF. This appears to be a LaTeX-generated PDF (vector-based text) which requires OCR. Please install Tesseract OCR to enable LaTeX PDF support. See OCR_SETUP.md for installation instructions.")
-            elif OCR_AVAILABLE and use_ocr_fallback:
-                raise ValueError("LATEX_PDF_OCR_FAILED: LaTeX-based PDF detected - could not extract meaningful text from PDF. The file might be a LaTeX-generated PDF (vector-based), image-based (scanned), corrupted, or password-protected. OCR was attempted but failed. Please ensure your PDF contains readable text or try exporting as PDF/A from Overleaf.")
-            else:
-                raise ValueError("LATEX_PDF_NO_TEXT: LaTeX-based PDF detected - could not extract meaningful text from PDF. The file might be a LaTeX-generated PDF (vector-based), image-based (scanned), corrupted, or password-protected. For LaTeX-generated PDFs, OCR support is required. Please install Tesseract OCR or try exporting as PDF/A from Overleaf.")
+            # Provide error message for LaTeX/vector PDFs
+            raise ValueError("PDF_NO_TEXT: Could not extract meaningful text from PDF. The file might be a LaTeX-generated PDF (vector-based), image-based (scanned), corrupted, or password-protected. For LaTeX PDFs, please export as PDF/A from Overleaf or use a PDF with selectable text.")
     
     logger.info(f"[RESUME_PARSER] PDF parsing completed successfully using {parser_used}")
     return extract_resume_data(text)
@@ -420,7 +236,7 @@ def parse_docx(file_path: str) -> Dict[str, Any]:
     
     if not DOCX_AVAILABLE:
         logger.error("[RESUME_PARSER] python-docx is not installed")
-        raise ImportError("python-docx is not installed. Install with: pip install python-docx")
+        raise ImportError("python-docx is not installed. Please install dependencies: pip install -r requirements.txt")
     
     try:
         logger.debug(f"[RESUME_PARSER] Attempting DOCX parsing with python-docx...")

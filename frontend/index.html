@@ -144,8 +144,9 @@
     </div>
 
     <!-- Load API configuration first - must be before app.js -->
-    <script src="api-config.js"></script>
-    <script src="app.js"></script>
+    <!-- FIX 5: Add cache-busting query param to prevent browser from serving cached JavaScript -->
+    <script src="api-config.js?v=20260101"></script>
+    <script src="app.js?v=20260101"></script>
 </body>
 </html>
 
