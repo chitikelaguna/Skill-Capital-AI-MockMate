@@ -14,8 +14,10 @@ if str(PROJECT_ROOT) not in sys.path:
 # Import the FastAPI app
 from app.main import app
 
-# Export handler for Vercel
-# Vercel's Python runtime should auto-detect ASGI apps
-# The handler should be the ASGI application instance
+# Export both 'app' and 'handler' for Vercel compatibility
+# Vercel's Python runtime may look for either variable
+# The app is an ASGI application that Vercel should auto-detect
 handler = app
+# Also export as 'app' in case Vercel looks for that
+__all__ = ['handler', 'app']
 
