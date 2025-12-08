@@ -1,8 +1,8 @@
 {
   "functions": {
     "api/index.py": {
-      "includeFiles": "app/**,frontend/**,requirements.txt",
-      "excludeFiles": "**/__pycache__/**,**/*.pyc,**/*.pyo,**/*.pyd"
+      "includeFiles": "app/**,requirements.txt,frontend/**",
+      "excludeFiles": "**/__pycache__/**,**/*.pyc,**/*.pyo,**/*.pyd,**/*.md,**/*.txt,app/database/schema.sql,**/tests/**,**/test_*.py,**/*_test.py,**/.git/**,**/.github/**,**/README.md,**/docs/**,frontend/**/*.map,frontend/**/*.min.js.map"
     }
   },
   "rewrites": [

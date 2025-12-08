@@ -109,9 +109,10 @@ tmp/
 .gitignore
 .gitattributes
 
-# Documentation (optional - can include if needed)
-# README.md
-# docs/
+# Documentation (exclude to reduce size)
+README.md
+*.md
+docs/
 
 # Deployment configs for other platforms (not needed for Vercel)
 railway.json
@@ -146,4 +147,13 @@ samples/
 # Python type stubs (optional)
 *.pyi
 py.typed
+
+# Additional exclusions for size optimization
+app/database/schema.sql
+tests/
+test_*.py
+*_test.py
+.github/
+*.txt
+!requirements.txt
 

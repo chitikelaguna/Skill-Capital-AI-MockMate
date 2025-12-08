@@ -20,19 +20,28 @@ def _try_import_langchain():
         return True
     
     try:
+        # Use langchain-core for smaller bundle size
         from langchain_openai import ChatOpenAI
-        from langchain.prompts import ChatPromptTemplate
+        from langchain_core.prompts import ChatPromptTemplate
         OPENAI_AVAILABLE = True
         return True
     except (ImportError, TypeError, AttributeError):
         try:
-            from langchain.chat_models import ChatOpenAI
+            # Fallback to langchain.prompts if langchain-core not available
+            from langchain_openai import ChatOpenAI
             from langchain.prompts import ChatPromptTemplate
             OPENAI_AVAILABLE = True
             return True
         except (ImportError, TypeError, AttributeError):
-            OPENAI_AVAILABLE = False
-            return False
+            try:
+                # Fallback for older langchain versions
+                from langchain.chat_models import ChatOpenAI
+                from langchain.prompts import ChatPromptTemplate
+                OPENAI_AVAILABLE = True
+                return True
+            except (ImportError, TypeError, AttributeError):
+                OPENAI_AVAILABLE = False
+                return False
 
 class AnswerEvaluator:
     """Evaluate interview answers using OpenAI"""
