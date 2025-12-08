@@ -19,7 +19,8 @@ httpx==0.27.2
 
 # AI & LLM Integration (optimized - removed langchain-community)
 # Using langchain-core instead of full langchain for smaller size
-langchain-core==0.3.7
+# langchain-openai 0.2.8 requires langchain-core>=0.3.17,<0.4.0
+langchain-core==0.3.17
 langchain-openai==0.2.8
 openai==1.54.3
 
