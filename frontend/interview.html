@@ -1366,39 +1366,75 @@
                     // Try to extract text from query parameter
                     try {
                         const url = new URL(textOrUrl);
+                        
+                        // ✅ CRITICAL FIX: Detect localhost/127.0.0.1 URLs and regenerate audio
+                        // These URLs won't work on Vercel because browser cannot access server's localhost
+                        const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
                         const textParam = url.searchParams.get('text');
-                        if (textParam) {
+                        
+                        if (isLocalhost && textParam) {
+                            // Backend returned localhost URL - extract text and regenerate using correct endpoint
+                            console.warn('[TTS] Detected localhost URL from backend, regenerating audio with correct endpoint:', textOrUrl);
+                            text = decodeURIComponent(textParam);
+                            // Fall through to TTS generation below using TECH_BACKEND_URL
+                        } else if (textParam) {
+                            // Valid URL with text parameter - extract text
                             text = decodeURIComponent(textParam);
                         } else {
-                            // If it's a direct audio URL, play it
-                            const audio = new Audio(textOrUrl);
-                            currentAudio = audio;  // Track current audio instance
-                            isAudioPlaying = true;
-                            
-                            // ✅ FIX: Wait for audio to finish playing before returning
-                            const audioPlayPromise = new Promise((resolve, reject) => {
-                                audio.onended = () => {
-                                    document.getElementById('voiceStatus').textContent = 'Click the microphone to start recording';
-                                    currentAudio = null;
-                                    isAudioPlaying = false;
-                                    resolve();
-                                };
-                                audio.onerror = (e) => {
-                                    console.error('[TTS] Direct audio URL playback failed:', e);
-                                    document.getElementById('voiceStatus').textContent = 'Audio playback failed. Question is displayed above.';
-                                    currentAudio = null;
-                                    isAudioPlaying = false;
-                                    reject(e);
-                                };
-                            });
-                            await audio.play();
-                            document.getElementById('voiceStatus').textContent = 'AI is speaking the question...';
-                            // Wait for audio to finish
-                            await audioPlayPromise;
-                            return;
+                            // If it's a direct audio URL (not localhost), try to play it
+                            if (!isLocalhost) {
+                                const audio = new Audio(textOrUrl);
+                                currentAudio = audio;  // Track current audio instance
+                                isAudioPlaying = true;
+                                
+                                // ✅ FIX: Wait for audio to finish playing before returning
+                                const audioPlayPromise = new Promise((resolve, reject) => {
+                                    audio.onended = () => {
+                                        document.getElementById('voiceStatus').textContent = 'Click the microphone to start recording';
+                                        currentAudio = null;
+                                        isAudioPlaying = false;
+                                        resolve();
+                                    };
+                                    audio.onerror = (e) => {
+                                        console.error('[TTS] Direct audio URL playback failed:', e);
+                                        // If direct URL fails, extract text and regenerate
+                                        if (textParam) {
+                                            text = decodeURIComponent(textParam);
+                                            // Fall through to TTS generation
+                                            resolve(); // Don't reject, let it regenerate
+                                        } else {
+                                            document.getElementById('voiceStatus').textContent = 'Audio playback failed. Question is displayed above.';
+                                            currentAudio = null;
+                                            isAudioPlaying = false;
+                                            reject(e);
+                                        }
+                                    };
+                                });
+                                try {
+                                    await audio.play();
+                                    document.getElementById('voiceStatus').textContent = 'AI is speaking the question...';
+                                    // Wait for audio to finish
+                                    await audioPlayPromise;
+                                    return;
+                                } catch (playError) {
+                                    // If play fails, extract text and regenerate
+                                    console.warn('[TTS] Direct audio play failed, regenerating:', playError);
+                                    if (textParam) {
+                                        text = decodeURIComponent(textParam);
+                                        // Fall through to TTS generation
+                                    } else {
+                                        throw playError;
+                                    }
+                                }
+                            } else {
+                                // Localhost URL without text param - treat as invalid, use as text
+                                console.warn('[TTS] Invalid localhost URL without text parameter:', textOrUrl);
+                                text = textOrUrl;
+                            }
                         }
                     } catch (e) {
                         // Not a valid URL, treat as text
+                        console.warn('[TTS] URL parsing failed, treating as text:', e);
                         text = textOrUrl;
                     }
                 }

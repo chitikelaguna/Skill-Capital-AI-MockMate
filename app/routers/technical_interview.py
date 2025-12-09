@@ -220,9 +220,13 @@ async def start_interview_page(
             question_text = first_question_data.get("question", "")
             if question_text:
                 encoded_text = urllib.parse.quote(question_text)
-                # Use absolute URL - works for both localhost and production
-                base_url = get_api_base_url()
+                # Use TECH_BACKEND_URL if set, otherwise use request-based URL detection
+                from app.config.settings import settings
+                base_url = settings.tech_backend_url or get_api_base_url(http_request)
+                # Ensure base_url doesn't end with slash
+                base_url = base_url.rstrip('/')
                 audio_url = f"{base_url}/api/interview/text-to-speech?text={encoded_text}"
+                logger.info(f"[START INTERVIEW] Generated audio_url: {audio_url}")
         except Exception as e:
             logger.warning(f"Could not generate audio URL for first question: {str(e)}")
         
@@ -628,7 +632,11 @@ Return ONLY the question text, nothing else. Make it sound natural and conversat
         try:
             if question_text:
                 encoded_text = urllib.parse.quote(question_text)
-                base_url = get_api_base_url()
+                # Use TECH_BACKEND_URL if set, otherwise use request-based URL detection
+                from app.config.settings import settings
+                base_url = settings.tech_backend_url or get_api_base_url(http_request)
+                # Ensure base_url doesn't end with slash
+                base_url = base_url.rstrip('/')
                 audio_url = f"{base_url}/api/interview/text-to-speech?text={encoded_text}"
                 logger.info(f"[TECHNICAL][INTERVIEW] ✅ Generated audio_url: {audio_url}")
             else:
@@ -779,9 +787,13 @@ Provide brief, encouraging feedback for this technical interview answer."""
         if ai_response:
             try:
                 encoded_text = urllib.parse.quote(ai_response)
-                base_url = get_api_base_url()
+                # Use TECH_BACKEND_URL if set, otherwise use request-based URL detection
+                from app.config.settings import settings
+                base_url = settings.tech_backend_url or get_api_base_url(http_request)
+                # Ensure base_url doesn't end with slash
+                base_url = base_url.rstrip('/')
                 ai_response_audio_url = f"{base_url}/api/interview/text-to-speech?text={encoded_text}"
-                logger.info(f"[TECHNICAL][SUBMIT-ANSWER] Generated AI feedback audio URL")
+                logger.info(f"[TECHNICAL][SUBMIT-ANSWER] Generated AI feedback audio URL: {ai_response_audio_url}")
             except Exception as e:
                 logger.warning(f"[TECHNICAL][SUBMIT-ANSWER] Could not generate audio URL: {str(e)}")
         
