@@ -938,18 +938,142 @@
         let modalResolve = null;
 
         // Get current authenticated user from user_profiles
+        // VERSION 2.0 - Fixed to include user_id in API call
         async function getCurrentUser() {
+            console.log('[CODING] getCurrentUser() called - VERSION 2.0');
             try {
-                const res = await fetch(`${getApiBase()}/api/profile/current`);
-                if (!res.ok) {
-                    throw new Error(`Failed to get current user: ${res.status}`);
+                // First, try to get from localStorage (persistent) or sessionStorage
+                // Check multiple possible storage keys (app.js stores in session_user_id and resume_user_id)
+                const storedUserId = localStorage.getItem('user_id') || 
+                                    sessionStorage.getItem('resume_user_id') || 
+                                    sessionStorage.getItem('session_user_id') ||
+                                    window.CURRENT_USER_ID;
+                
+                // Debug logging
+                console.log('[CODING] Checking storage for user_id:', {
+                    localStorage_user_id: localStorage.getItem('user_id'),
+                    sessionStorage_resume_user_id: sessionStorage.getItem('resume_user_id'),
+                    sessionStorage_session_user_id: sessionStorage.getItem('session_user_id'),
+                    window_CURRENT_USER_ID: window.CURRENT_USER_ID,
+                    found: storedUserId
+                });
+                
+                if (storedUserId) {
+                    // We have user_id in storage, validate it with the backend
+                    currentUserId = storedUserId;
+                    window.CURRENT_USER_ID = storedUserId;
+                    
+                    try {
+                        // Call API with user_id as required query parameter
+                        const res = await fetch(`${getApiBase()}/api/profile/current?user_id=${encodeURIComponent(storedUserId)}`, {
+                            cache: 'no-store',
+                            headers: {
+                                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                'Pragma': 'no-cache'
+                            }
+                        });
+                        
+                        if (!res.ok) {
+                            if (res.status === 404) {
+                                // User profile not found in database
+                                throw new Error('User profile not found. Please upload your resume first to create your profile.');
+                            } else if (res.status === 400) {
+                                // Invalid user_id format
+                                throw new Error('Invalid user ID. Please upload your resume again.');
+                            } else {
+                                throw new Error(`Failed to verify user profile: ${res.status}`);
+                            }
+                        }
+                        
+                        const user = await res.json();
+                        // Verify user_id matches
+                        if (user.user_id !== storedUserId) {
+                            console.warn('[CODING] User ID mismatch, using stored ID');
+                        }
+                        currentUserId = user.user_id || storedUserId;
+                        
+                        // Store in both localStorage (persistent) and sessionStorage
+                        if (currentUserId) {
+                            localStorage.setItem('user_id', currentUserId);
+                            sessionStorage.setItem('resume_user_id', currentUserId);
+                            window.CURRENT_USER_ID = currentUserId;
+                        }
+                        
+                        return user;
+                    } catch (apiError) {
+                        // If API call fails but we have stored user_id, use it as fallback
+                        console.warn('[CODING] API validation failed, using stored user_id:', apiError.message);
+                        return { user_id: storedUserId };
+                    }
                 }
-                const user = await res.json();
-                currentUserId = user.user_id;
-                return user;
+                
+                // No user_id in storage - try to extract from resume analysis cache
+                try {
+                    const cachedResumeData = sessionStorage.getItem('resume_analysis_data');
+                    if (cachedResumeData) {
+                        const resumeData = JSON.parse(cachedResumeData);
+                        // Some resume analysis responses might have user_id embedded
+                        if (resumeData.user_id) {
+                            console.log('[CODING] Found user_id in resume analysis cache:', resumeData.user_id);
+                            currentUserId = resumeData.user_id;
+                            sessionStorage.setItem('resume_user_id', resumeData.user_id);
+                            sessionStorage.setItem('session_user_id', resumeData.user_id);
+                            window.CURRENT_USER_ID = resumeData.user_id;
+                            
+                            // Try to validate with backend
+                            try {
+                                const res = await fetch(`${getApiBase()}/api/profile/current?user_id=${encodeURIComponent(resumeData.user_id)}`, {
+                                    cache: 'no-store',
+                                    headers: {
+                                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                        'Pragma': 'no-cache'
+                                    }
+                                });
+                                if (res.ok) {
+                                    const user = await res.json();
+                                    return user;
+                                }
+                            } catch (apiErr) {
+                                console.warn('[CODING] Could not validate cached user_id, using it anyway:', apiErr.message);
+                            }
+                            
+                            return { user_id: resumeData.user_id };
+                        }
+                    }
+                } catch (cacheErr) {
+                    console.warn('[CODING] Could not parse resume analysis cache:', cacheErr.message);
+                }
+                
+                // No user_id found anywhere - user needs to upload resume first
+                throw new Error('Please upload your resume first to start the interview.');
+                
             } catch (e) {
-                console.error('Error getting current user:', e);
-                throw new Error('No authenticated user found. Please ensure a user exists in user_profiles table.');
+                console.error('[CODING] Error getting current user:', e);
+                
+                // Try one more fallback: check storage again (including all possible keys)
+                const fallbackUserId = localStorage.getItem('user_id') || 
+                                     sessionStorage.getItem('resume_user_id') || 
+                                     sessionStorage.getItem('session_user_id') ||
+                                     window.CURRENT_USER_ID;
+                
+                console.log('[CODING] Fallback check:', {
+                    localStorage_user_id: localStorage.getItem('user_id'),
+                    sessionStorage_resume_user_id: sessionStorage.getItem('resume_user_id'),
+                    sessionStorage_session_user_id: sessionStorage.getItem('session_user_id'),
+                    window_CURRENT_USER_ID: window.CURRENT_USER_ID,
+                    found: fallbackUserId
+                });
+                
+                if (fallbackUserId) {
+                    console.log('[CODING] Using fallback user_id from storage');
+                    currentUserId = fallbackUserId;
+                    window.CURRENT_USER_ID = fallbackUserId;
+                    return { user_id: fallbackUserId };
+                }
+                
+                // No user_id found anywhere - show clear error message
+                const errorMessage = e.message || 'No authenticated user found. Please upload your resume first to create your profile.';
+                throw new Error(errorMessage);
             }
         }
 
@@ -1582,14 +1706,48 @@ int main() {
                 initEditor();
                 startInterview();
             } catch (e) {
-                console.error('Initialization failed:', e);
-                document.getElementById('questionContent').innerHTML = `
+                console.error('[CODING] Initialization failed:', e);
+                
+                // Determine error type and show appropriate message
+                let errorTitle = 'Error';
+                let errorMessage = e.message || 'An unexpected error occurred. Please try again.';
+                let showRetry = true;
+                let showUploadResume = false;
+                
+                if (errorMessage.includes('upload your resume') || errorMessage.includes('resume first')) {
+                    errorTitle = 'Resume Required';
+                    showUploadResume = true;
+                } else if (errorMessage.includes('profile not found')) {
+                    errorTitle = 'Profile Not Found';
+                    showUploadResume = true;
+                } else if (errorMessage.includes('Server error') || errorMessage.includes('network')) {
+                    errorTitle = 'Connection Error';
+                    errorMessage = 'Server error. Please check your internet connection and try again.';
+                }
+                
+                let errorHtml = `
                     <div style="text-align: center; padding: 60px 40px;">
-                        <h3 style="color: #FF006A; margin-bottom: 16px;">Error</h3>
-                        <p style="color: #1E1E1E; margin-bottom: 24px;">${e.message}</p>
-                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
-                    </div>
+                        <h3 style="color: #FF006A; margin-bottom: 16px;">${errorTitle}</h3>
+                        <p style="color: #1E1E1E; margin-bottom: 24px; line-height: 1.6;">${errorMessage}</p>
                 `;
+                
+                if (showUploadResume) {
+                    errorHtml += `
+                        <div style="margin-bottom: 20px;">
+                            <button class="btn btn-primary" onclick="window.location.href='index.html'">Upload Resume</button>
+                        </div>
+                    `;
+                }
+                
+                if (showRetry) {
+                    errorHtml += `
+                        <button class="btn btn-primary" onclick="location.reload()" style="${showUploadResume ? 'margin-left: 10px;' : ''}">Retry</button>
+                    `;
+                }
+                
+                errorHtml += `</div>`;
+                
+                document.getElementById('questionContent').innerHTML = errorHtml;
             }
         });
     </script>
