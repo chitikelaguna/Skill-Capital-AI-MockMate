@@ -178,16 +178,45 @@ function getApiBase() {
     return apiBase;
 }
 
+// Helper function to validate URL format
+function isValidUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 // Helper function to get TECH_BACKEND_URL for audio generation
 // Uses TECH_BACKEND_URL environment variable if set, otherwise falls back to API_BASE
 function getTechBackendUrl() {
     // Check if TECH_BACKEND_URL is explicitly set via environment variable (injected at build time)
     // Vercel injects environment variables at build time, so we check for a global variable
     if (typeof window.TECH_BACKEND_URL !== 'undefined' && window.TECH_BACKEND_URL) {
-        return window.TECH_BACKEND_URL;
+        const techUrl = window.TECH_BACKEND_URL;
+        if (isValidUrl(techUrl)) {
+            return techUrl;
+        } else {
+            // Invalid URL - warn in development and fallback
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                console.warn('[API-CONFIG] TECH_BACKEND_URL is set but invalid:', techUrl, '- falling back to API_BASE');
+            }
+        }
+    } else {
+        // TECH_BACKEND_URL not set - warn in development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.warn('[API-CONFIG] TECH_BACKEND_URL is undefined - using API_BASE as fallback');
+        }
     }
     
-    // Fallback to API_BASE if TECH_BACKEND_URL not set
+    // Fallback to API_BASE if TECH_BACKEND_URL not set or invalid
     return getApiBase();
 }
+
+// Export functions to window for global access
+window.getApiBase = getApiBase;
+window.getTechBackendUrl = getTechBackendUrl;
+window.ensureApiBaseReady = ensureApiBaseReady;
 

@@ -87,7 +87,11 @@ async function getCurrentUser() {
         }
         
         // If not in storage, fetch from API
-        const res = await fetch(`${getApiBase()}/api/profile/current`);
+        const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+        const res = await fetch(`${API_BASE}/api/profile/current`).catch(networkError => {
+            console.error('[HR INTERVIEW] Network error fetching current user:', networkError);
+            throw new Error('Network error: Unable to connect to server. Please check your internet connection.');
+        });
         if (!res.ok) {
             throw new Error(`Failed to get current user: ${res.status}`);
         }
@@ -144,6 +148,60 @@ function setupEventListeners() {
     });
 }
 
+// Simple toast notification function
+function showToast(message, type = 'error', duration = 5000) {
+    // Remove existing toast if any
+    const existingToast = document.getElementById('hrToast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.id = 'hrToast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#ef5350' : type === 'success' ? '#4caf50' : '#2196f3'};
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 400px;
+        font-size: 14px;
+        font-weight: 500;
+        animation: slideIn 0.3s ease;
+    `;
+    toast.textContent = message;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    if (!document.getElementById('hrToastStyle')) {
+        style.id = 'hrToastStyle';
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after duration
+    setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+        }, 300);
+    }, duration);
+}
+
 async function startInterview() {
     // Prevent double submission
     if (isLoading.startInterview) {
@@ -152,6 +210,24 @@ async function startInterview() {
     
     try {
         setLoadingState('startInterview', true);
+        
+        // Ensure API_BASE is ready before making requests
+        await ensureApiBaseReady();
+        
+        // Get API base URL using helper function
+        const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+        const TECH_BACKEND = typeof window.getTechBackendUrl === 'function' ? window.getTechBackendUrl() : getTechBackendUrl();
+        
+        // Fail-fast: Validate API_BASE is available
+        if (!API_BASE) {
+            const errorMsg = 'API configuration error: Unable to determine API base URL. Please refresh the page.';
+            console.error('[HR INTERVIEW]', errorMsg);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
+        }
+        
+        console.log('[HR INTERVIEW] Using API_BASE:', API_BASE);
+        console.log('[HR INTERVIEW] Using TECH_BACKEND:', TECH_BACKEND);
         
     // Ensure we have current user
     if (!currentUserId) {
@@ -178,18 +254,47 @@ async function startInterview() {
 
     try {
         // Start HR interview session
-        // Use endpoint: /api/interview/hr/start
-        const response = await fetch(`${getApiBase()}/api/interview/hr/start`, {
+        // Use endpoint: /api/interview/hr/start with API_BASE helper
+        const startUrl = `${API_BASE}/api/interview/hr/start`;
+        console.log('[HR INTERVIEW] Starting interview with URL:', startUrl);
+        
+        const response = await fetch(startUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId })
+        }).catch(networkError => {
+            // Network error (fetch failed completely)
+            const errorMsg = `Network error: Unable to connect to server. Please check your internet connection.`;
+            console.error('[HR INTERVIEW] Network error:', networkError);
+            console.error('[HR INTERVIEW] Failed URL:', startUrl);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
         });
 
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[HR INTERVIEW] Error response:', errorText);
-            throw new Error(`Failed to start interview: ${response.status} - ${errorText}`);
+            // Try to parse error response as JSON
+            let errorDetail = '';
+            let errorData = null;
+            try {
+                const errorText = await response.text();
+                errorDetail = errorText;
+                // Try to parse as JSON
+                try {
+                    errorData = JSON.parse(errorText);
+                    errorDetail = errorData.detail || errorData.error || errorText;
+                } catch {
+                    // Not JSON, use text as-is
+                }
+            } catch (parseError) {
+                errorDetail = `HTTP ${response.status}`;
+            }
+            
+            const errorMsg = `Failed to start interview: ${response.status} - ${errorDetail}`;
+            console.error('[HR INTERVIEW] Error response:', response.status, errorDetail);
+            console.error('[HR INTERVIEW] Error data:', errorData);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
         }
 
         const data = await response.json();
@@ -244,15 +349,23 @@ async function startInterview() {
         }
 
     } catch (error) {
-            // Create error object with status if available
-            const errorObj = {
-                message: error.message || 'Failed to start interview. Please try again.',
-                status: error.status || (error.response?.status),
-                response: error.response,
-                originalError: error
-            };
-            
-            showUserFriendlyError(errorObj, 'startInterview', true);
+        // Network or API error - show toast and log details
+        const errorMessage = error.message || 'Failed to start interview. Please try again.';
+        console.error('[HR INTERVIEW] Start interview error:', error);
+        console.error('[HR INTERVIEW] Error stack:', error.stack);
+        
+        // Show user-visible toast
+        showToast(errorMessage, 'error');
+        
+        // Create error object with status if available
+        const errorObj = {
+            message: errorMessage,
+            status: error.status || (error.response?.status),
+            response: error.response,
+            originalError: error
+        };
+        
+        showUserFriendlyError(errorObj, 'startInterview', true);
         
         // Show setup section again so user can retry
         document.getElementById('setupSection').classList.remove('hidden');
@@ -263,14 +376,29 @@ async function startInterview() {
         // Reset interview state
         interviewActive = false;
         interviewSessionId = null;
-        }
-    } catch (error) {
-        // Outer catch for unexpected errors
+    }
+    } catch (outerError) {
+        // Outer catch for unexpected errors (e.g., from ensureApiBaseReady, getCurrentUser, etc.)
+        const errorMessage = outerError.message || 'An unexpected error occurred.';
+        console.error('[HR INTERVIEW] Unexpected error:', outerError);
+        console.error('[HR INTERVIEW] Error stack:', outerError.stack);
+        showToast(errorMessage, 'error');
+        
         const errorObj = {
-            message: error.message || 'An unexpected error occurred.',
-            originalError: error
+            message: errorMessage,
+            originalError: outerError
         };
         showUserFriendlyError(errorObj, 'startInterview', true);
+        
+        // Show setup section again so user can retry
+        document.getElementById('setupSection').classList.remove('hidden');
+        document.getElementById('interviewSection').classList.add('hidden');
+        document.getElementById('interviewStatus').textContent = 'Ready to Start';
+        document.getElementById('interviewStatus').classList.remove('active');
+        
+        // Reset interview state
+        interviewActive = false;
+        interviewSessionId = null;
     } finally {
         // Always re-enable button and hide loading states
         setLoadingState('startInterview', false);
@@ -621,13 +749,19 @@ async function processAudioAnswer(audioBlob) {
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
 
-        const sttResponse = await fetch(`${getApiBase()}/api/interview/speech-to-text`, {
+        const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+        const sttResponse = await fetch(`${API_BASE}/api/interview/speech-to-text`, {
             method: 'POST',
             body: formData
+        }).catch(networkError => {
+            console.error('[HR INTERVIEW] Network error in speech-to-text:', networkError);
+            throw new Error('Network error: Unable to connect to server. Please check your internet connection.');
         });
 
         if (!sttResponse.ok) {
-            throw new Error(`STT API failed with status: ${sttResponse.status}`);
+            const errorText = await sttResponse.text().catch(() => 'Unknown error');
+            console.error('[HR INTERVIEW] STT API error:', sttResponse.status, errorText);
+            throw new Error(`STT API failed with status: ${sttResponse.status} - ${errorText}`);
         }
 
         const sttData = await sttResponse.json();
@@ -694,8 +828,11 @@ async function submitAnswer(answer) {
         setLoadingState('submitAnswer', true);
         console.log('[SUBMIT ANSWER] Submitting HR answer to backend...');
         
+        // Get API base URL using helper function
+        const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+        
         // Use HR-specific submit answer endpoint
-        const response = await fetch(`${getApiBase()}/api/interview/hr/${interviewSessionId}/submit-answer`, {
+        const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/submit-answer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -703,12 +840,35 @@ async function submitAnswer(answer) {
                 answer: answer,
                 response_time: null  // Can be calculated if needed
             })
+        }).catch(networkError => {
+            const errorMsg = 'Network error: Unable to submit answer. Please check your internet connection.';
+            console.error('[HR INTERVIEW] Network error submitting answer:', networkError);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
+            let errorText = '';
+            let errorData = null;
+            try {
+                errorText = await response.text();
+                try {
+                    errorData = JSON.parse(errorText);
+                    errorText = errorData.detail || errorData.error || errorText;
+                } catch {
+                    // Not JSON, use text as-is
+                }
+            } catch (parseError) {
+                errorText = `HTTP ${response.status}`;
+            }
+            
+            const errorMsg = `Failed to submit answer: ${response.status} - ${errorText}`;
+            console.error('[HR INTERVIEW] Submit answer error:', response.status, errorText);
+            console.error('[HR INTERVIEW] Error data:', errorData);
+            showToast(errorMsg, 'error');
+            
             const errorObj = {
-                message: `Failed to submit answer: ${response.status}`,
+                message: errorMsg,
                 status: response.status,
                 responseText: errorText,
                 originalError: new Error(`HTTP ${response.status}: ${errorText}`)
@@ -769,8 +929,15 @@ async function submitAnswer(answer) {
         document.getElementById('voiceStatus').textContent = 'Click the microphone to record your answer';
 
     } catch (error) {
+        const errorMessage = error.message || 'Failed to submit answer. Please try again.';
+        console.error('[HR INTERVIEW] Submit answer error:', error);
+        if (!error.message || !error.message.includes('Network error')) {
+            // Only show toast if not already shown (network errors already show toast)
+            showToast(errorMessage, 'error');
+        }
+        
         const errorObj = {
-            message: error.message || 'Failed to submit answer. Please try again.',
+            message: errorMessage,
             status: error.status,
             originalError: error
         };
@@ -809,6 +976,9 @@ async function getNextHRQuestion(userAnswer = null) {
             console.log('[HR INTERVIEW] Sending user answer for context-aware question generation');
         }
         
+        // Get API base URL using helper function
+        const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+        
         // Call backend endpoint to get next AI-generated HR question
         // Send user_answer if provided so backend can save it and use it for context-aware generation
         const requestBody = {};
@@ -816,17 +986,39 @@ async function getNextHRQuestion(userAnswer = null) {
             requestBody.user_answer = userAnswer;
         }
         
-        const response = await fetch(`${getApiBase()}/api/interview/hr/${interviewSessionId}/next-question`, {
+        const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/next-question`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestBody)
+        }).catch(networkError => {
+            const errorMsg = 'Network error: Unable to fetch next question. Please check your internet connection.';
+            console.error('[HR INTERVIEW] Network error fetching next question:', networkError);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Backend error: ${response.status} - ${errorText}`);
+            let errorText = '';
+            let errorData = null;
+            try {
+                errorText = await response.text();
+                try {
+                    errorData = JSON.parse(errorText);
+                    errorText = errorData.detail || errorData.error || errorText;
+                } catch {
+                    // Not JSON, use text as-is
+                }
+            } catch (parseError) {
+                errorText = `HTTP ${response.status}`;
+            }
+            
+            const errorMsg = `Backend error: ${response.status} - ${errorText}`;
+            console.error('[HR INTERVIEW] Get next question error:', response.status, errorText);
+            console.error('[HR INTERVIEW] Error data:', errorData);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
         }
 
         const data = await response.json();
@@ -980,22 +1172,47 @@ async function generateFeedback() {
         setLoadingState('generateFeedback', true);
         console.log('[FEEDBACK] Requesting HR feedback from backend...');
         
+        // Get API base URL using helper function
+        const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+        
         // Use HR-specific feedback endpoint
-        const response = await fetch(`${getApiBase()}/api/interview/hr/${interviewSessionId}/feedback`, {
+        const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/feedback`, {
             method: 'GET'
+        }).catch(networkError => {
+            const errorMsg = 'Network error: Unable to fetch feedback. Please check your internet connection.';
+            console.error('[HR INTERVIEW] Network error fetching feedback:', networkError);
+            showToast(errorMsg, 'error');
+            throw new Error(errorMsg);
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
+            let errorText = '';
+            let errorData = null;
+            try {
+                errorText = await response.text();
+                try {
+                    errorData = JSON.parse(errorText);
+                    errorText = errorData.detail || errorData.error || errorText;
+                } catch {
+                    // Not JSON, use text as-is
+                }
+            } catch (parseError) {
+                errorText = `HTTP ${response.status}`;
+            }
+            
+            const errorMsg = `Failed to generate feedback: ${response.status} - ${errorText}`;
+            console.error('[FEEDBACK] HR feedback endpoint error:', response.status, errorText);
+            console.error('[FEEDBACK] Error data:', errorData);
+            showToast(errorMsg, 'error');
+            
             const errorObj = {
-                message: `Failed to generate feedback: ${response.status}`,
+                message: errorMsg,
                 status: response.status,
                 responseText: errorText,
                 originalError: new Error(`HTTP ${response.status}: ${errorText}`)
             };
             
             // Log error but fallback to basic feedback
-            console.error('[FEEDBACK] HR feedback endpoint error:', response.status, errorText);
             showUserFriendlyError(errorObj, 'generateFeedback', true);
             
             // Fallback to basic feedback if endpoint fails
@@ -1298,7 +1515,9 @@ async function playAudio(audioUrl, retryCount = 0) {
                     console.debug('[HR DEBUG TTS] Text to convert:', text.substring(0, 100) + '...');
                     
                     // Use TECH_BACKEND_URL for audio generation (supports separate backend deployment)
-                    const techBackendUrl = typeof getTechBackendUrl !== 'undefined' ? getTechBackendUrl() : getApiBase();
+                    const techBackendUrl = typeof window.getTechBackendUrl === 'function' 
+                        ? window.getTechBackendUrl() 
+                        : (typeof getTechBackendUrl !== 'undefined' ? getTechBackendUrl() : getApiBase());
                     const audioApiUrl = `${techBackendUrl}/api/interview/generate-audio`;
                     
                     // Use POST endpoint instead
@@ -1949,9 +2168,15 @@ async function endInterview() {
 
         if (interviewSessionId) {
             try {
+                // Get API base URL using helper function
+                const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
+                
                 // FIX: Use HR-specific endpoint instead of technical endpoint
-                const response = await fetch(`${getApiBase()}/api/interview/hr/${interviewSessionId}/end`, {
+                const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/end`, {
                     method: 'POST'
+                }).catch(networkError => {
+                    console.error('[HR INTERVIEW] Network error ending interview:', networkError);
+                    // Don't show toast for end interview - it's not critical
                 });
                 
                 if (response.ok) {

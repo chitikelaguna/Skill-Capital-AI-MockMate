@@ -3,6 +3,7 @@ HR Interview Routes
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Body
+from fastapi.responses import JSONResponse
 from typing import Any, Dict, List
 from supabase import Client
 from app.db.client import get_supabase_client
@@ -14,6 +15,7 @@ from app.routers.interview_utils import (
     HR_WARMUP_COUNT
 )
 from app.utils.url_utils import get_api_base_url
+from app.utils.exceptions import ValidationError, NotFoundError, DatabaseError
 from app.config.settings import settings
 from app.services.question_generator import question_generator
 from app.services.answer_evaluator import answer_evaluator
@@ -34,9 +36,10 @@ from datetime import datetime
 import urllib.parse
 import json
 import logging
+import traceback
 import re
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("hr_interview")
 
 router = APIRouter(prefix="/hr", tags=["hr-interview"])
 
@@ -57,28 +60,27 @@ async def start_hr_interview(
     Start a new HR interview session
     Returns the first HR question based on resume
     """
-    # FIX 12: Test database connection at the start
-    if not test_supabase_connection(supabase):
-        raise HTTPException(
-            status_code=503,
-            detail="Database connection unavailable. Please try again shortly."
-        )
-    
     try:
+        # FIX 12: Test database connection at the start
+        if not test_supabase_connection(supabase):
+            raise HTTPException(
+                status_code=503,
+                detail="Database connection unavailable. Please try again shortly."
+            )
         # Input validation
         user_id = request_body.get("user_id")
         
         if not user_id:
-            logger.error("[HR][START] Missing user_id in request body")
-            raise HTTPException(status_code=400, detail="Missing required information in the request. Please ensure all fields are provided.")
+            logger.warning("[HR][START] Missing user_id in request body")
+            raise ValidationError("Missing required information in the request. Please ensure all fields are provided.")
         
         if not isinstance(user_id, str) or not user_id.strip():
-            logger.error(f"[HR][START] Invalid user_id format: {user_id}")
-            raise HTTPException(status_code=400, detail="Invalid request format. Please check your input and try again.")
+            logger.warning(f"[HR][START] Invalid user_id format: {user_id}")
+            raise ValidationError("Invalid request format. Please check your input and try again.")
         
         # Validate user_id format: alphanumeric, hyphen, underscore only
         if not re.match(r'^[a-zA-Z0-9_-]+$', user_id):
-            raise HTTPException(status_code=400, detail="Invalid user_id format")
+            raise ValidationError("Invalid user_id format")
         
         # Check rate limit
         check_rate_limit(user_id)
@@ -94,21 +96,15 @@ async def start_hr_interview(
         except Exception as db_error:
             # Log detailed error information for debugging
             logger.error(
-                f"[HR][START] Database error fetching user profile for user_id: {user_id}. Error: {str(db_error)}", 
+                f"[HR][START] Database error fetching user profile for user_id: {user_id}. Error: {str(db_error)}\n{traceback.format_exc()}", 
                 exc_info=True
             )
             
-            # Raise HTTPException with 500 status and user-friendly message
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to start interview due to a server error. Please try again."
-            )
+            # Raise DatabaseError for structured error handling
+            raise DatabaseError(f"Failed to start interview due to a server error. Please try again.")
         
         if not profile:
-            raise HTTPException(
-                status_code=404,
-                detail="User profile not found. Please upload a resume first to create your profile."
-            )
+            raise NotFoundError("User profile", user_id)
         
         # Build resume context
         resume_context = build_resume_context_from_profile(profile, supabase)
@@ -127,17 +123,17 @@ async def start_hr_interview(
             session_response = supabase.table("interview_sessions").insert(db_session_data).execute()
             if not session_response.data or len(session_response.data) == 0:
                 logger.error("[HR][START] Failed to create interview session - no data returned")
-                raise HTTPException(status_code=500, detail="A server error occurred while processing your request. Please try again.")
+                raise DatabaseError("A server error occurred while processing your request. Please try again.")
             session_id = session_response.data[0]["id"]
+        except ValidationError:
+            # Re-raise ValidationError as-is (from foreign key constraint check)
+            raise
         except Exception as db_error:
             error_str = str(db_error)
-            logger.error(f"[HR][START] Database error creating session: {str(db_error)}", exc_info=True)
+            logger.error(f"[HR][START] Database error creating session: {str(db_error)}\n{traceback.format_exc()}", exc_info=True)
             if "foreign key constraint" in error_str.lower():
-                raise HTTPException(
-                    status_code=400,
-                    detail="User profile not found. Please upload a resume first to create your profile."
-                )
-            raise HTTPException(status_code=500, detail="A server error occurred while processing your request. Please try again.")
+                raise ValidationError("User profile not found. Please upload a resume first to create your profile.")
+            raise DatabaseError("A server error occurred while processing your request. Please try again.")
         
         # ✅ WARM-UP STAGE: Always start with first warm-up question (question_number = 1)
         # Warm-up questions help students and freshers feel relaxed and confident
@@ -185,10 +181,7 @@ async def start_hr_interview(
             insert_response = supabase.table("hr_round").insert(question_db_data).execute()
             if not insert_response.data or len(insert_response.data) == 0:
                 logger.error("[HR][START] Failed to store HR question - no data returned from insert")
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to save interview question. Please try again."
-                )
+                raise DatabaseError("Failed to save interview question. Please try again.")
             # ✅ FIX 1: Verify question_number is correctly saved
             saved_question = insert_response.data[0] if insert_response.data else None
             if saved_question:
@@ -199,37 +192,59 @@ async def start_hr_interview(
                     logger.warning(f"[HR][START] ⚠️ Expected question_number=1, but got {saved_question_number}")
             else:
                 logger.warning(f"[HR][START] ⚠️ Insert succeeded but no data returned")
-        except HTTPException:
-            # Re-raise HTTPException as-is
+        except (ValidationError, NotFoundError, DatabaseError):
+            # Re-raise custom exceptions as-is
             raise
         except Exception as e:
-            logger.error(f"[HR][START] Failed to store HR question: {str(e)}", exc_info=True)
+            logger.error(f"[HR][START] Failed to store HR question: {str(e)}\n{traceback.format_exc()}", exc_info=True)
             # ✅ FIX 1: Do NOT continue if storage fails - raise error immediately
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to save interview question. Please try again."
-            )
+            raise DatabaseError("Failed to save interview question. Please try again.")
         
         response_data = {
             "session_id": session_id,
             "question": question_text,
+            "first_question": question_text,  # Required key for frontend compatibility
             "question_type": "HR",
             "question_number": 1,
             "total_questions": HR_WARMUP_COUNT + 7,  # 3 warm-up + 7 resume-based = 10 total
             "interview_completed": False,  # First question, interview not completed
             "is_warmup": True,  # Indicate this is a warm-up question
             "user_id": user_id,
-            "audio_url": audio_url  # Include audio URL for TTS playback
+            "audio_url": audio_url if audio_url else None  # Ensure audio_url is always present (null if not available)
         }
         logger.info(f"[HR][START] ✅ Returning response with audio_url: {audio_url is not None}")
         logger.info(f"[HR][START] Response keys: {list(response_data.keys())}")
         return response_data
         
+    except ValidationError as e:
+        logger.warning("HR start validation error: %s", str(e))
+        return JSONResponse(
+            status_code=400,
+            content={"error": "validation", "detail": str(e)}
+        )
+    except NotFoundError as e:
+        logger.warning("HR start not found: %s", str(e))
+        return JSONResponse(
+            status_code=404,
+            content={"error": "not_found", "detail": str(e)}
+        )
+    except DatabaseError as e:
+        tb = traceback.format_exc()
+        logger.error("HR start db error: %s\n%s", str(e), tb)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "db_error", "detail": "internal"}
+        )
     except HTTPException:
+        # Re-raise HTTPException as-is (for 503 database connection errors, etc.)
         raise
     except Exception as e:
-        logger.error(f"[HR][START] Unexpected error starting HR interview: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to start interview. Please try again.")
+        tb = traceback.format_exc()
+        logger.exception("HR start unexpected error: %s", str(e))
+        return JSONResponse(
+            status_code=500,
+            content={"error": "unexpected", "detail": str(e), "trace": tb}
+        )
 
 
 @router.post("/{session_id}/next-question", response_model=HRNextQuestionResponse)
