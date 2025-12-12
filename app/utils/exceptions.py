@@ -52,3 +52,12 @@ class DatabaseError(AppException):
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(message, status_code=500, details=details)
 
+
+class ConfigurationError(AppException):
+    """
+    Exception for configuration errors (missing environment variables, etc.)
+    Time Complexity: O(1)
+    Space Complexity: O(1)
+    """
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, status_code=500, details=details)

@@ -61,6 +61,26 @@ async def start_hr_interview(
     Returns the first HR question based on resume
     """
     try:
+        # Guard check: Validate Supabase configuration before database calls
+        if not settings.supabase_service_key and not settings.supabase_key:
+            logger.error("[HR][START] Supabase keys missing: VERCEL env may be unset")
+            logger.error("[HR][START] SUPABASE_SERVICE_KEY: Missing")
+            logger.error("[HR][START] SUPABASE_KEY (anon): Missing")
+            logger.error("[HR][START] This will cause database operations to fail")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "supabase_misconfigured",
+                    "detail": "Supabase configuration missing. Please check environment variables."
+                }
+            )
+        
+        # Log Supabase user context (service role vs anon)
+        if settings.supabase_service_key:
+            logger.debug("[HR][START] Using Supabase service role client (bypasses RLS)")
+        elif settings.supabase_key:
+            logger.debug("[HR][START] Using Supabase anon key client (respects RLS)")
+        
         # FIX 12: Test database connection at the start
         if not test_supabase_connection(supabase):
             raise HTTPException(
@@ -200,20 +220,27 @@ async def start_hr_interview(
             # ✅ FIX 1: Do NOT continue if storage fails - raise error immediately
             raise DatabaseError("Failed to save interview question. Please try again.")
         
+        # Harmonize response shape with Technical interview endpoint
+        # Core fields matching Technical: session_id, question, audio_url
+        # Additional HR-specific fields preserved for backwards compatibility
         response_data = {
-            "session_id": session_id,
-            "question": question_text,
-            "first_question": question_text,  # Required key for frontend compatibility
+            "session_id": session_id if session_id else None,
+            "question": question_text if question_text else None,  # Primary key matching Technical
+            "first_question": question_text if question_text else None,  # Alias for frontend compatibility
             "question_type": "HR",
             "question_number": 1,
             "total_questions": HR_WARMUP_COUNT + 7,  # 3 warm-up + 7 resume-based = 10 total
             "interview_completed": False,  # First question, interview not completed
-            "is_warmup": True,  # Indicate this is a warm-up question
+            "is_warmup": True,  # Indicate this is a warm-up question (HR-specific)
             "user_id": user_id,
             "audio_url": audio_url if audio_url else None  # Ensure audio_url is always present (null if not available)
         }
-        logger.info(f"[HR][START] ✅ Returning response with audio_url: {audio_url is not None}")
-        logger.info(f"[HR][START] Response keys: {list(response_data.keys())}")
+        
+        # Log response payload at debug level for verification
+        logger.debug(f"[HR][START] Response payload: {response_data}")
+        logger.info(f"[HR][START] ✅ Returning response with session_id: {session_id is not None}, question: {question_text is not None}, audio_url: {audio_url is not None}")
+        logger.info(f"[HR][START] Response keys (harmonized with Technical): {list(response_data.keys())}")
+        
         return response_data
         
     except ValidationError as e:

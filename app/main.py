@@ -57,10 +57,18 @@ async def lifespan(app: FastAPI):
     """Initialize services on application startup and cleanup on shutdown"""
     # Startup
     
-    # Test Supabase connection on startup
-    logger.info("[STARTUP] Testing Supabase connection...")
+    # Validate Supabase configuration at startup (non-blocking for Vercel)
+    logger.info("[STARTUP] Validating Supabase configuration...")
     try:
-        from app.db.client import get_supabase_client
+        from app.db.client import validate_supabase_config, get_supabase_client
+        
+        # Validate config (non-raising for Vercel compatibility)
+        config_valid = validate_supabase_config(raise_on_missing=False)
+        if not config_valid:
+            logger.warning("[STARTUP] ⚠️  Supabase configuration incomplete - some operations may fail")
+        
+        # Test Supabase connection on startup
+        logger.info("[STARTUP] Testing Supabase connection...")
         
         # Check if credentials are set
         if not settings.supabase_url or not settings.supabase_service_key:

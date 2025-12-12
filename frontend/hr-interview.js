@@ -7,6 +7,10 @@
  * 
  * VERSION: 2.0 - Custom Modal Implementation (2025-01-12)
  */
+// Build verification log (dev-only)
+if (typeof console !== 'undefined' && console.debug) {
+    console.debug('[HR INTERVIEW] HR script loaded - Build verification');
+}
 console.log('[HR INTERVIEW] Script loaded - Version 2.0 with Custom Modal');
 
 // State
@@ -148,8 +152,8 @@ function setupEventListeners() {
     });
 }
 
-// Simple toast notification function
-function showToast(message, type = 'error', duration = 5000) {
+// Auto-hides after specified duration (default 4s for errors)
+function showToast(message, type = 'error', duration = 4000) {
     // Remove existing toast if any
     const existingToast = document.getElementById('hrToast');
     if (existingToast) {
@@ -256,48 +260,71 @@ async function startInterview() {
         // Start HR interview session
         // Use endpoint: /api/interview/hr/start with API_BASE helper
         const startUrl = `${API_BASE}/api/interview/hr/start`;
+        const payload = { user_id: userId };
         console.log('[HR INTERVIEW] Starting interview with URL:', startUrl);
+        console.log('[HR INTERVIEW] Payload:', payload);
         
-        const response = await fetch(startUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId })
-        }).catch(networkError => {
-            // Network error (fetch failed completely)
-            const errorMsg = `Network error: Unable to connect to server. Please check your internet connection.`;
-            console.error('[HR INTERVIEW] Network error:', networkError);
-            console.error('[HR INTERVIEW] Failed URL:', startUrl);
-            showToast(errorMsg, 'error');
-            throw new Error(errorMsg);
-        });
-
+        let response;
+        let data;
         
-        if (!response.ok) {
-            // Try to parse error response as JSON
-            let errorDetail = '';
-            let errorData = null;
+        try {
+            response = await fetch(startUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            // Parse response as JSON (even if error response)
             try {
-                const errorText = await response.text();
-                errorDetail = errorText;
-                // Try to parse as JSON
-                try {
-                    errorData = JSON.parse(errorText);
-                    errorDetail = errorData.detail || errorData.error || errorText;
-                } catch {
-                    // Not JSON, use text as-is
-                }
-            } catch (parseError) {
-                errorDetail = `HTTP ${response.status}`;
+                data = await response.json();
+            } catch (jsonError) {
+                // If JSON parsing fails, try to get text
+                const errorText = await response.text().catch(() => 'Unknown error');
+                console.error('[HR INTERVIEW] Failed to parse response as JSON:', errorText);
+                data = { error: errorText, detail: errorText };
             }
             
-            const errorMsg = `Failed to start interview: ${response.status} - ${errorDetail}`;
-            console.error('[HR INTERVIEW] Error response:', response.status, errorDetail);
-            console.error('[HR INTERVIEW] Error data:', errorData);
-            showToast(errorMsg, 'error');
-            throw new Error(errorMsg);
+            // Check if response is not OK
+            if (!response.ok) {
+                console.error('[HR INTERVIEW] HR start failed:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: data
+                });
+                const errorMsg = 'Unable to start HR interview: ' + (data.detail || data.error || response.statusText || `HTTP ${response.status}`);
+                showToast(errorMsg, 'error');
+                throw new Error(errorMsg);
+            }
+            
+            // Validate session_id is present
+            if (!data.session_id) {
+                console.error('[HR INTERVIEW] HR start missing session_id:', data);
+                showToast('HR interview failed: session id missing', 'error');
+                throw new Error('HR interview failed: session id missing');
+            }
+            
+            // Success - continue with existing success handling
+            console.log('[HR INTERVIEW] ✅ HR interview started successfully:', {
+                session_id: data.session_id,
+                question: data.question ? data.question.substring(0, 50) + '...' : 'No question',
+                audio_url: data.audio_url ? 'Present' : 'Missing'
+            });
+            
+        } catch (err) {
+            // Network error or other fetch-related errors
+            if (err.message && err.message.includes('Unable to start HR interview')) {
+                // Already handled above, re-throw
+                throw err;
+            }
+            console.error('[HR INTERVIEW] HR start network error:', err);
+            console.error('[HR INTERVIEW] Error details:', {
+                name: err.name,
+                message: err.message,
+                stack: err.stack
+            });
+            showToast('Network error while starting HR interview. Check console for details.', 'error');
+            throw err;
         }
-
-        const data = await response.json();
         
         interviewSessionId = data.session_id;
         interviewActive = true;
