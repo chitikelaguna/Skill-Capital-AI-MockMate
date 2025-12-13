@@ -6,8 +6,14 @@
  * api-config.js provides: getApiBase(), ensureApiBaseReady(), API_BASE
  * 
  * VERSION: 2.0 - Custom Modal Implementation (2025-01-12)
+ * 
+ * FIX: Ensured clean file start (no BOM), fixed DOMContentLoaded syntax error
+ * The "Unexpected token ':'" error on Vercel was caused by missing document.addEventListener
+ * wrapper around the DOMContentLoaded arrow function, which made the parser see invalid syntax
  */
-// ✅ CRITICAL: Top-level console.log for Vercel build verification
+// ✅ CRITICAL: Top-level console.log for Vercel build verification - proves file parsed successfully
+// This MUST execute if the file is parsed correctly - if you don't see this, the file failed to parse
+console.log("[HR INTERVIEW] JS parsed and executing");
 console.log("HR Interview JS loaded on Vercel");
 console.log("[HR INTERVIEW] ✅ HR JS LOADED - File is being served");
 
