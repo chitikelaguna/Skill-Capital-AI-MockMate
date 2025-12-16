@@ -305,13 +305,66 @@ if FRONTEND_DIR.exists():
                 status_code=404
             )
     
+    # Serve STAR interview page (CRITICAL: Register BEFORE catch-all to ensure Vercel routing)
+    @app.get("/star-interview.html", response_class=HTMLResponse, include_in_schema=False)
+    async def serve_star_interview():
+        """Serve STAR interview page"""
+        star_path = FRONTEND_DIR / "star-interview.html"
+        if star_path.exists():
+            # CRITICAL: Explicit Content-Type with charset to prevent raw JS rendering on Vercel
+            return FileResponse(
+                star_path, 
+                media_type="text/html",
+                headers={
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Cache-Control": "no-store, no-cache, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+        else:
+            return HTMLResponse(
+                content="<h1>STAR Interview Page Not Found</h1><p>star-interview.html not found in frontend directory.</p>",
+                status_code=404
+            )
+    
+    # Serve STAR interview guidelines page
+    @app.get("/star-guidelines.html", response_class=HTMLResponse, include_in_schema=False)
+    async def serve_star_guidelines():
+        """Serve STAR interview guidelines page"""
+        guidelines_path = FRONTEND_DIR / "star-guidelines.html"
+        if guidelines_path.exists():
+            return FileResponse(
+                guidelines_path, 
+                media_type="text/html",
+                headers={
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Cache-Control": "no-store, no-cache, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0"
+                }
+            )
+        else:
+            return HTMLResponse(
+                content="<h1>STAR Guidelines Page Not Found</h1><p>star-guidelines.html not found in frontend directory.</p>",
+                status_code=404
+            )
+    
     # Serve interview page
     @app.get("/interview.html", response_class=HTMLResponse, include_in_schema=False)
     async def serve_interview():
         """Serve interview page"""
         interview_path = FRONTEND_DIR / "interview.html"
         if interview_path.exists():
-            return FileResponse(interview_path, media_type="text/html")
+            # Explicitly set Content-Type header to ensure HTML parsing
+            return FileResponse(
+                interview_path, 
+                media_type="text/html",
+                headers={
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Cache-Control": "no-cache"
+                }
+            )
         else:
             return HTMLResponse(
                 content="<h1>Interview Page Not Found</h1><p>interview.html not found in frontend directory.</p>",
@@ -390,6 +443,27 @@ if FRONTEND_DIR.exists():
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Not Found")
         
+        # SAFETY: Explicitly prevent catch-all from serving pages with dedicated routes
+        # This ensures star-interview.html is always served by its specific route
+        dedicated_routes = [
+            "/star-interview.html",
+            "/star-guidelines.html",
+            "/interview.html",
+            "/technical-interview.html",
+            "/coding-interview.html",
+            "/hr-interview.html",
+            "/resume-analysis.html",
+            "/coding-result.html"
+        ]
+        if path in dedicated_routes:
+            # This should not happen - dedicated routes should match first
+            # Return 404 to force proper route matching
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=404,
+                detail=f"Route {path} should be handled by dedicated route handler, not catch-all"
+            )
+        
         # Build file path
         file_path_clean = file_path.lstrip("/")
         full_path = FRONTEND_DIR / file_path_clean
@@ -409,7 +483,10 @@ if FRONTEND_DIR.exists():
                 return FileResponse(
                     full_path, 
                     media_type="text/html",
-                    headers={"Cache-Control": "no-cache"}
+                    headers={
+                        "Content-Type": "text/html; charset=utf-8",
+                        "Cache-Control": "no-cache"
+                    }
                 )
             elif file_path_clean.endswith(".css"):
                 return FileResponse(

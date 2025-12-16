@@ -1165,12 +1165,8 @@
 
     <!-- Load API configuration first -->
     <script src="api-config.js"></script>
-    <script type="text/javascript">
-        // ============================================
-        // STAR Interview - Embedded JavaScript
-        // Execution-only page - auto-starts on load
-        // ============================================
-        
+    <script>
+
         // State
         let currentUserId = null;
         let interviewSessionId = null;
@@ -1192,7 +1188,7 @@
         // Stop and destroy any currently playing audio
         function stopCurrentAudio() {
             if (currentAudio) {
-                console.log('[STAR INTERVIEW] Stopping current audio playback');
+                console.log('[TECHNICAL INTERVIEW] Stopping current audio playback');
                 try {
                     currentAudio.pause();
                     currentAudio.currentTime = 0;
@@ -1201,7 +1197,7 @@
                         URL.revokeObjectURL(currentAudio.src);
                     }
                 } catch (e) {
-                    console.warn('[STAR INTERVIEW] Error stopping audio:', e);
+                    console.warn('[TECHNICAL INTERVIEW] Error stopping audio:', e);
                 }
                 currentAudio = null;
                 isAudioPlaying = false;
@@ -1311,7 +1307,7 @@
                 
                 interviewSessionId = data.session_id;
                 interviewActive = true;
-                conversationHistory = [];  // Start with empty history (like Technical Interview)
+                conversationHistory = [];  // Start with empty history (like HR/STAR)
 
                 // Hide loading, show interview
                 document.getElementById('loadingState').classList.add('hidden');
@@ -1330,7 +1326,7 @@
                     container.innerHTML = '';
                 }
 
-                // Display first question if available
+                // ✅ CONVERSATIONAL FLOW: Display first question if available (like HR/STAR interviews)
                 if (data.question) {
                     currentQuestion = data.question;
                     conversationHistory.push({
@@ -1349,7 +1345,7 @@
                             });
                         }, 100);
                     } else {
-                        console.error('[STAR INTERVIEW] ❌ No audio_url received for first question');
+                        console.error('[TECHNICAL INTERVIEW] ❌ No audio_url received for first question');
                     }
                 } else {
                     showError('No question received. Please try again.');
@@ -1373,7 +1369,6 @@
         async function toggleRecording() {
             if (!interviewActive) return;
             if (isAudioPlaying) {
-                console.log('[STAR INTERVIEW] Cannot record while audio is playing');
                 document.getElementById('voiceStatus').textContent = 'Please wait for the question to finish...';
                 return;
             }
@@ -1454,7 +1449,6 @@
                 const noAnswerCheck = detectNoAnswer(rawUserAnswer);
                 let userAnswer;
                 if (noAnswerCheck.isNoAnswer) {
-                    console.log(`[STAR INTERVIEW] No Answer detected: ${noAnswerCheck.reason}`);
                     userAnswer = 'No Answer';
                 } else {
                     userAnswer = rawUserAnswer.trim();
@@ -1465,7 +1459,6 @@
 
             } catch (error) {
                 console.error('Process audio error:', error);
-                console.log('[STAR INTERVIEW] STT failed, treating as No Answer');
                 const userAnswer = 'No Answer';
                 displayMessage('user', userAnswer);
                 await submitAnswer(userAnswer);
@@ -1490,7 +1483,6 @@
 
             try {
                 setLoadingState('submitAnswer', true);
-                console.log('[SUBMIT ANSWER] Submitting STAR answer to backend...');
                 
                 const response = await fetch(`${getApiBase()}/api/interview/star/${interviewSessionId}/submit-answer`, {
                     method: 'POST',
@@ -1508,7 +1500,6 @@
                 }
 
                 const data = await response.json();
-                console.log('[SUBMIT ANSWER] ✅ STAR answer submitted successfully');
                 
                 conversationHistory.push({
                     role: 'user',
@@ -1526,7 +1517,7 @@
                     
                     if (data.audio_url) {
                         await playAudio(data.audio_url).catch(err => {
-                            console.warn('[STAR INTERVIEW] AI response audio playback failed:', err);
+                            console.warn('[TECHNICAL INTERVIEW] Audio playback failed for feedback:', err);
                         });
                     }
                 }
@@ -1560,7 +1551,7 @@
             }
 
             if (isLoading.getNextQuestion) {
-                console.warn('[STAR INTERVIEW] Get next question already in progress, ignoring duplicate call');
+                console.warn('[SUBMIT ANSWER] getNextQuestion already in progress, ignoring duplicate call');
                 return;
             }
 
@@ -1591,7 +1582,6 @@
                 const data = await response.json();
                 
                 if (data.interview_completed) {
-                    console.log('[STAR INTERVIEW] Interview completed:', data.message);
                     await completeInterview();
                     return;
                 }
@@ -1615,17 +1605,15 @@
                 await new Promise(resolve => setTimeout(resolve, 100));
                 if (audioUrl && audioUrl.trim()) {
                     await playAudio(audioUrl).catch(err => {
-                        console.warn('[STAR INTERVIEW] Next question audio playback failed:', err);
                     });
                 } else if (nextQuestion) {
                     // Fallback: generate TTS from question text
                     await playAudio(nextQuestion).catch(err => {
-                        console.warn('[STAR INTERVIEW] Fallback TTS generation failed:', err);
                     });
                 }
 
             } catch (error) {
-                console.error('[STAR INTERVIEW] ❌ Get question error:', error);
+                console.error('[SUBMIT ANSWER] Submit answer error:', error);
                 showError(`Failed to get question: ${error.message || 'Please try again.'}`);
                 document.getElementById('voiceStatus').textContent = 'Error occurred. Please try recording again or start a new interview.';
             } finally {
@@ -1705,7 +1693,6 @@
 
             try {
                 setLoadingState('generateFeedback', true);
-                console.log('[FEEDBACK] Requesting STAR feedback from backend...');
                 
                 const response = await fetch(`${getApiBase()}/api/interview/star/${interviewSessionId}/feedback`, {
                     method: 'GET'
@@ -1713,7 +1700,6 @@
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('[FEEDBACK] STAR feedback endpoint error:', response.status, errorText);
                     generateBasicFeedback();
                     return;
                 }
@@ -1724,7 +1710,6 @@
                     return;
                 }
 
-                console.log('[FEEDBACK] ✅ STAR feedback received successfully');
                 
                 const overallScore = Math.round(feedback.overall_score || 0);
                 document.getElementById('overallScore').textContent = overallScore;
@@ -2156,7 +2141,7 @@
                             method: 'POST'
                         });
                     } catch (error) {
-                        console.error('[STAR INTERVIEW] Error sending end signal:', error);
+                        console.error('Error ending interview:', error);
                     }
                 }
                 await completeInterview();

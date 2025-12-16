@@ -11,6 +11,14 @@
       "destination": "/api/index.py"
     },
     {
+      "source": "/star-interview.html",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/star-guidelines.html",
+      "destination": "/api/index.py"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/index.py"
     }
