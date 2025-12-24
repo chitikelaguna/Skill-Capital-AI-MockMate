@@ -10,14 +10,12 @@ from app.config.settings import settings
 def get_api_base_url(request: Optional[object] = None) -> str:
     """
     Get the API base URL dynamically based on environment.
-    Works for both localhost and Vercel deployments.
     
     Priority:
     1. TECH_BACKEND_URL (explicitly configured backend URL for audio generation)
-    2. VERCEL_URL (Vercel automatically provides this)
-    3. FRONTEND_URL (manually configured)
-    4. Request host (from incoming request)
-    5. Localhost fallback (development only)
+    2. FRONTEND_URL (manually configured)
+    3. Request host (from incoming request)
+    4. Localhost fallback (development only)
     
     Args:
         request: FastAPI Request object (optional)
@@ -34,23 +32,7 @@ def get_api_base_url(request: Optional[object] = None) -> str:
                 return f"https://{tech_url}"
             return tech_url
     
-    # Priority 2: Vercel URL (automatically set by Vercel)
-    vercel_url = os.getenv("VERCEL_URL")
-    if vercel_url:
-        # Vercel provides just the domain (e.g., "app.vercel.app")
-        # We need to add https://
-        if not vercel_url.startswith("http"):
-            return f"https://{vercel_url}"
-        return vercel_url
-    
-    # Also check settings
-    if settings.vercel_url:
-        vercel_url = settings.vercel_url
-        if not vercel_url.startswith("http"):
-            return f"https://{vercel_url}"
-        return vercel_url
-    
-    # Priority 3: Configured frontend URL
+    # Priority 2: Configured frontend URL
     if settings.frontend_url:
         return settings.frontend_url
     

@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["star-interview"])
 
 
+
 @router.post("/star/start", response_model=STARInterviewStartResponse)
 async def start_star_interview(
     http_request: Request,

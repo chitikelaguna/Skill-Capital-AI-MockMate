@@ -24,7 +24,7 @@ def validate_supabase_config(raise_on_missing: bool = False) -> bool:
     
     Args:
         raise_on_missing: If True, raise ConfigurationError when required keys are missing.
-                         If False (default), only log warnings (for Vercel compatibility)
+                         If False (default), only log warnings
     
     Returns:
         bool: True if all required keys are present, False otherwise
@@ -59,7 +59,9 @@ def validate_supabase_config(raise_on_missing: bool = False) -> bool:
     if missing_keys:
         error_msg = f"Missing required Supabase configuration: {', '.join(missing_keys)}"
         logger.error(f"[SUPABASE CONFIG] {error_msg}")
-        logger.error("[SUPABASE CONFIG] This may cause database operations to fail on Vercel if env variables are not set.")
+    if missing_keys:
+        error_msg = f"Missing required Supabase configuration: {', '.join(missing_keys)}"
+        logger.error(f"[SUPABASE CONFIG] {error_msg}")
         
         if raise_on_missing:
             raise ConfigurationError(

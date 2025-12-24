@@ -18,7 +18,8 @@ from app.schemas.interview import (
     CodingInterviewStartResponse,
     CodingNextQuestionResponse,
     CodingResultsResponse,
-    CodeRunResponse
+    CodeRunResponse,
+    InterviewEndResponse
 )
 from app.utils.rate_limiter import check_rate_limit, rate_limit_by_session_id
 from app.utils.request_validator import validate_request_size
@@ -40,10 +41,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/coding", tags=["coding-interview"])
 
-
-@router.get("/_health")
-async def coding_health():
-    return {"ok": True}
 
 
 @router.post("/start", response_model=CodingInterviewStartResponse)
@@ -1344,7 +1341,7 @@ def solve():
     return result
 
 
-@router.post("/{session_id}/next", response_model=CodingNextQuestionResponse)
+@router.post("/{session_id}/next-question", response_model=CodingNextQuestionResponse)
 async def get_next_coding_question(
     session_id: str,
     http_request: Request,
@@ -1808,136 +1805,7 @@ async def get_next_coding_question(
         raise HTTPException(status_code=500, detail=f"Error getting next coding question: {str(e)}")
 
 
-@router.get("/{session_id}/results", response_model=CodingResultsResponse)
-async def get_coding_results(
-    session_id: str,
-    supabase: Client = Depends(get_supabase_client),
-    _: None = Depends(rate_limit_by_session_id)
-):
-    """
-    Get all coding interview results for a session
-    """
-    try:
-        logger.info(f"🔍 Fetching results for session_id: {session_id}")
-        
-        # First, verify session exists
-        try:
-            session_check = supabase.table("interview_sessions").select("id, user_id").eq("id", session_id).execute()
-            if not session_check.data:
-                logger.warning(f"⚠️ Session {session_id} not found in interview_sessions table")
-            else:
-                logger.info(f"✓ Session found: {session_check.data[0]}")
-        except Exception as e:
-            logger.warning(f"Could not verify session: {str(e)}")
-        
-        # Fetch results with explicit error handling
-        # ✅ FIX: Only fetch answered questions (where user_code is not null/empty)
-        try:
-            results_response = supabase.table("coding_round").select("*").eq("session_id", session_id).not_.is_("user_code", "null").neq("user_code", "").order("question_number").execute()
-            results = results_response.data or []
-        except Exception as e:
-            logger.error(f"✗ Error fetching results: {str(e)}")
-            # Check if table exists
-            try:
-                test_query = supabase.table("coding_round").select("id").limit(1).execute()
-                logger.info("✓ coding_round table exists and is accessible")
-            except Exception as table_error:
-                logger.error(f"✗ coding_round table may not exist or is not accessible: {str(table_error)}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Database error: {str(table_error)}. Please verify coding_round table exists in Supabase."
-                )
-            raise
-        
-        # ✅ FIX: Filter out any results where user_code is empty/null (shouldn't happen with query above, but double-check)
-        results = [r for r in results if r.get("user_code") and str(r.get("user_code", "")).strip()]
-        
-        # Log for debugging
-        logger.info(f"📊 Retrieved {len(results)} answered questions for session {session_id}")
-        if len(results) == 0:
-            logger.warning(f"⚠️ No answered questions found for session {session_id}")
-            # Try to find any results with this session_id (for debugging)
-            try:
-                all_results = supabase.table("coding_round").select("session_id, question_number, user_id, user_code").eq("session_id", session_id).limit(10).execute()
-                sample_data = [(r.get('session_id'), r.get('question_number'), r.get('user_id'), bool(r.get('user_code'))) for r in (all_results.data or [])[:5]]
-                logger.info(f"Sample data in coding_round table (including unanswered): {sample_data}")
-                
-                # Check if there are results with similar session_id
-                all_sessions = supabase.table("coding_round").select("session_id").limit(100).execute()
-                unique_sessions = list(set([r.get('session_id') for r in (all_sessions.data or [])]))
-                logger.info(f"Unique session_ids in database (first 10): {unique_sessions[:10]}")
-            except Exception as debug_error:
-                logger.warning(f"Could not fetch debug info: {str(debug_error)}")
-        else:
-            for i, r in enumerate(results):
-                user_code_len = len(str(r.get('user_code', '')))
-                logger.info(f"Result {i+1}: question_number={r.get('question_number')}, user_code_length={user_code_len}, execution_output={bool(r.get('execution_output'))}, ai_feedback={bool(r.get('ai_feedback'))}, correct_solution={bool(r.get('correct_solution'))}, correctness={r.get('correctness')}, score={r.get('final_score')}")
-        
-        # Ensure all fields are present (handle None values from database)
-        for result in results:
-            # Convert None to empty string for display
-            if result.get("execution_output") is None:
-                result["execution_output"] = ""
-            if result.get("ai_feedback") is None:
-                result["ai_feedback"] = ""
-            if result.get("correct_solution") is None:
-                result["correct_solution"] = ""
-            if result.get("user_code") is None:
-                result["user_code"] = ""
-            if result.get("question_text") is None:
-                result["question_text"] = ""
-            # Ensure all required fields exist
-            if "question_number" not in result:
-                result["question_number"] = 0
-            if "correctness" not in result:
-                result["correctness"] = False
-            if "final_score" not in result:
-                result["final_score"] = 0
-            if "programming_language" not in result:
-                result["programming_language"] = "python"
-            if "difficulty_level" not in result:
-                result["difficulty_level"] = "Medium"
-            # Add empty arrays/strings for optional fields if missing
-            if "errors_found" not in result:
-                result["errors_found"] = []
-            if "bugs_explained" not in result:
-                result["bugs_explained"] = []
-            if "improvements" not in result:
-                result["improvements"] = []
-            if "motivation_message" not in result:
-                result["motivation_message"] = ""
-            if "time_complexity" not in result:
-                result["time_complexity"] = ""
-            if "space_complexity" not in result:
-                result["space_complexity"] = ""
-        
-        # Calculate overall statistics
-        total_questions = len(results)
-        correct_answers = sum(1 for r in results if r.get("correctness", False))
-        total_score = sum(r.get("final_score", 0) for r in results)
-        average_score = total_score / total_questions if total_questions > 0 else 0
-        
-        logger.info(f"📈 Statistics: total={total_questions}, correct={correct_answers}, incorrect={total_questions - correct_answers}, avg_score={average_score:.2f}, accuracy={round((correct_answers / total_questions * 100) if total_questions > 0 else 0, 2)}%")
-        
-        return {
-            "session_id": session_id,
-            "results": results,
-            "statistics": {
-                "total_questions": total_questions,
-                "correct_answers": correct_answers,
-                "incorrect_answers": total_questions - correct_answers,
-                "total_score": total_score,
-                "average_score": round(average_score, 2),
-                "accuracy": round((correct_answers / total_questions * 100) if total_questions > 0 else 0, 2)
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"✗ Error in get_coding_results: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error fetching coding results: {str(e)}")
+
 
 
 # ==================== Coding Helper Functions ====================
@@ -2066,9 +1934,6 @@ async def execute_code_safely(code: str, language: str, test_input: str, sql_set
     Execute code safely using subprocess with timeout and resource limits
     Handles Windows and Unix systems properly
     
-    NOTE: On Vercel serverless, subprocess execution is limited.
-    Code execution will use LLM-based evaluation instead of actual execution.
-    
     Supported languages:
     - Python (with data science libraries: pandas, numpy, matplotlib, seaborn, scikit-learn)
     - Java (requires JDK)
@@ -2076,19 +1941,6 @@ async def execute_code_safely(code: str, language: str, test_input: str, sql_set
     - C/C++ (requires GCC/G++)
     - SQL (uses sqlite3 via Python)
     """
-    # Check if we're on Vercel (serverless environment)
-    is_vercel = os.getenv("VERCEL") == "1" or os.getenv("VERCEL_URL") is not None
-    
-    if is_vercel:
-        # On Vercel, subprocess execution is not available
-        # Return a message indicating LLM-based evaluation will be used
-        return {
-            "output": "",
-            "error": "Code execution is not available in serverless environment. Code will be evaluated using AI-based analysis instead of actual execution.",
-            "execution_time": 0,
-            "exit_code": 0,
-            "note": "On Vercel, code execution uses LLM-based evaluation. The code correctness will be determined by AI analysis rather than actual execution."
-        }
     
     tmp_file_path = None
     output_file = None
@@ -2714,4 +2566,70 @@ async def run_code(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error executing code: {str(e)}")
+
+
+@router.put("/{session_id}/end", response_model=InterviewEndResponse)
+async def end_coding_interview(
+    session_id: str,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    End the coding interview session
+    Updates session status to completed
+    """
+    try:
+        # Input validation
+        if not session_id or not isinstance(session_id, str) or not session_id.strip():
+            logger.error(f"[CODING][END] Invalid session_id: {session_id}")
+            raise HTTPException(status_code=400, detail="Invalid request format. Please check your input and try again.")
+        
+        logger.info(f"[CODING][END] Ending coding interview session: {session_id}")
+        
+        # Verify session exists and is coding type
+        try:
+            session_response = supabase.table("interview_sessions").select("*").eq("id", session_id).execute()
+        except Exception as db_error:
+            logger.error(f"[CODING][END] Database error fetching session: {str(db_error)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to retrieve interview session. Please try again.")
+        
+        if not session_response.data or len(session_response.data) == 0:
+            logger.warning(f"[CODING][END] Session not found: {session_id}")
+            raise HTTPException(status_code=404, detail="Interview session not found. Please start a new interview.")
+        
+        session = session_response.data[0]
+        
+        # Validate session is coding type
+        session_type = session.get("interview_type", "").lower()
+        if session_type != "coding":
+            logger.error(f"[CODING][END] Wrong session type: {session_type} (expected: coding)")
+            raise HTTPException(
+                status_code=400, 
+                detail="This endpoint is for coding interviews only. Please use the correct interview type."
+            )
+        
+        # Update session status to completed
+        # Use atomic update with row-level locking: only update if status is not already "completed"
+        try:
+            update_response = supabase.table("interview_sessions").update({
+                "session_status": "completed"
+            }).eq("id", session_id).neq("session_status", "completed").execute()
+            
+            if not update_response.data or len(update_response.data) == 0:
+                logger.info(f"[CODING][END] Session already completed for session_id: {session_id}")
+            else:
+                logger.info(f"[CODING][END] ✅ Coding interview session ended successfully: {session_id}")
+        except Exception as db_error:
+            logger.error(f"[CODING][END] Database error updating session status: {str(db_error)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to update session status. Please try again.")
+        
+        return {
+            "message": "Coding interview ended successfully",
+            "session_id": session_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CODING][END] Unexpected error ending coding interview: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to end interview. Please try again.")
 

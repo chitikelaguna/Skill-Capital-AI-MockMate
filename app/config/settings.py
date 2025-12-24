@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     backend_port: int = Field(default=8000, env="BACKEND_PORT")
     environment: str = Field(default="development", env="ENVIRONMENT")
     frontend_url: Optional[str] = Field(default=None, env="FRONTEND_URL")
-    vercel_url: Optional[str] = Field(default=None, env="VERCEL_URL")  # Vercel provides this automatically
     tech_backend_url: Optional[str] = Field(default=None, env="TECH_BACKEND_URL")  # Backend URL for technical interview audio generation
     
     # CORS Configuration - Use computed field to avoid pydantic-settings JSON parsing
@@ -58,12 +57,6 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """Get CORS origins as a list, parsing from environment variable"""
-        # Check if we're on Vercel
-        vercel_url = os.getenv("VERCEL_URL")
-        if vercel_url:
-            # On Vercel, allow the Vercel domain
-            vercel_origin = f"https://{vercel_url}"
-            return [vercel_origin, "*"]  # Allow Vercel domain and all origins for flexibility
         
         # Read directly from environment to avoid pydantic-settings JSON parsing
         cors_val = os.getenv('CORS_ORIGINS')

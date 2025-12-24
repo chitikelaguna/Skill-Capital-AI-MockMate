@@ -198,87 +198,6 @@ async def update_resume_experience(
         raise HTTPException(status_code=500, detail=f"Error updating experience: {str(e)}")
 
 
-@router.get("/current", response_model=UserProfileResponse)
-async def get_current_user(
-    user_id: Optional[str] = Query(None, description="Required user_id to fetch authenticated user profile"),
-    session_id: Optional[str] = Query(None, description="Session ID for validation (optional but recommended)"),
-    supabase: Client = Depends(get_supabase_client),
-    _: None = Depends(rate_limit_by_user_id)
-):
-    """
-    Get current authenticated user from user_profiles table
-    BUG FIX #2, #5: Returns Cache-Control headers and validates session
-    CRITICAL: user_id parameter is REQUIRED to prevent cross-user data leakage
-    This endpoint MUST always fetch the specific user's profile, never the first user
-    Time Complexity: O(1) - Single query
-    Space Complexity: O(1) - Returns single record
-    """
-    try:
-        # CRITICAL: user_id is REQUIRED - never fetch first user to prevent cross-user data leakage
-        if not user_id:
-            logger.error("[PROFILE][CURRENT] ❌ SECURITY: user_id parameter is required but was not provided")
-            raise HTTPException(
-                status_code=400, 
-                detail="user_id parameter is required. Please provide the authenticated user's user_id."
-            )
-        
-        # Validate user_id format
-        if not re.match(r'^[a-zA-Z0-9_-]+$', user_id):
-            logger.error(f"[PROFILE][CURRENT] ❌ Invalid user_id format: {user_id}")
-            raise HTTPException(status_code=400, detail="Invalid user_id format")
-        
-        # BUG FIX #5: Validate user_id exists in database (basic ownership validation)
-        # In a production system, this would validate against session/token
-        # For now, we validate that the user_id exists and is valid
-        logger.info(f"[PROFILE][CURRENT] Fetching profile for authenticated user_id: {user_id}, session_id: {session_id}")
-        
-        # Fetch the specific user's profile
-        user = await get_authenticated_user(supabase, user_id=user_id)
-        
-        if not user:
-            logger.warning(f"[PROFILE][CURRENT] Profile not found for user_id: {user_id}")
-            raise HTTPException(
-                status_code=404, 
-                detail=f"User profile not found for user_id '{user_id}'. Please upload a resume to create your profile."
-            )
-        
-        # BUG FIX #5: Verify user_id matches (additional validation)
-        if user.get('user_id') != user_id:
-            logger.error(f"[PROFILE][CURRENT] ❌ SECURITY: user_id mismatch! Requested: {user_id}, Found: {user.get('user_id')}")
-            raise HTTPException(
-                status_code=403,
-                detail="User ID mismatch - unauthorized access"
-            )
-        
-        # User profile is already sanitized by get_authenticated_user
-        # Prepare for Pydantic validation to ensure JSONB fields are normalized
-        prepared_user = prepare_profile_for_pydantic(user)
-        
-        try:
-            # BUG FIX #2: Create response with Cache-Control headers
-            from fastapi.responses import JSONResponse
-            response_data = UserProfileResponse(**prepared_user)
-            response = JSONResponse(content=response_data.dict())
-            # BUG FIX #2: Set cache headers to prevent Vercel/CDN caching
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            return response
-        except Exception as validation_error:
-            logger.error(f"[PROFILE][CURRENT] Pydantic validation failed: {str(validation_error)}")
-            raise HTTPException(
-                status_code=422,
-                detail=f"Profile data validation failed: {str(validation_error)}"
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        logger.error(f"[PROFILE][CURRENT] Error getting current user: {error_details}")
-        raise HTTPException(status_code=500, detail=f"Error getting current user: {str(e)}")
-
 
 @router.get("/{user_id}", response_model=UserProfileResponse)
 async def get_user_profile_by_id(
@@ -1068,26 +987,7 @@ async def upload_resume(
 
 
 # ============================================================================
-# POST /api/profile/{user_id}/upload-resume
-# Purpose: For admin/manual upload scenarios
-# Note: The user_id parameter is ignored - backend generates stable user_id from resume name
-# This route must come AFTER /upload-resume to avoid route conflicts
+# POST /api/profile/{user_id}/upload-resume - REMOVED
+# Reason: Duplicate endpoint - user_id parameter was ignored anyway
+# Frontend uses POST /api/profile/upload-resume instead
 # ============================================================================
-@router.post("/{user_id}/upload-resume", response_model=ResumeUploadResponse)
-async def upload_resume_with_user_id(
-    user_id: str,  # Ignored - backend generates user_id from resume name
-    file: UploadFile = File(...),
-    supabase: Client = Depends(get_supabase_client)
-):
-    """
-    Upload resume with user_id in path (backward compatibility)
-    Note: user_id parameter is ignored - backend generates stable user_id from resume name
-    This route handles old frontend code that includes user_id in the URL path
-    """
-    # Validate user_id format: alphanumeric, hyphen, underscore only
-    if not re.match(r'^[a-zA-Z0-9_-]+$', user_id):
-        raise HTTPException(status_code=400, detail="Invalid user_id format")
-    
-    logger.info(f"[UPLOAD] Received upload request with user_id in path: {user_id} (will be ignored, generating from resume)")
-    # Delegate to main upload function (user_id is ignored)
-    return await upload_resume(file=file, supabase=supabase)

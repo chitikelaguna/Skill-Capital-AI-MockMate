@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 # Coding endpoints moved to app.routers.coding_interview
 
 # Import common interview router
-from app.routers.interview_common import router as interview_common_router
+
 from app.routers.hr_interview import router as hr_router
 # Import STAR interview router
 from app.routers.star_interview import router as star_router
@@ -71,7 +71,7 @@ from app.routers.star_interview import router as star_router
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
 # Include common endpoints
-router.include_router(interview_common_router)
+
 # Include HR interview endpoints
 router.include_router(hr_router)
 # Include STAR interview endpoints

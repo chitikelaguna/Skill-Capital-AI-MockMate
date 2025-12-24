@@ -36,57 +36,36 @@ async def speech_to_text(
         if not technical_interview_engine.openai_available or technical_interview_engine.client is None:
             raise HTTPException(status_code=503, detail="Speech-to-text service is not available. OpenAI API key is required.")
         
-        # Read audio content into memory (works for both localhost and Vercel)
+        # Read audio content into memory
         content = await audio.read()
         
-        # For Vercel serverless, use in-memory file-like object
-        # For localhost, can use tempfile if needed
-        import os
-        is_vercel = os.getenv("VERCEL") == "1" or os.getenv("VERCEL_URL") is not None
+        # Use tempfile (has filesystem access)
+        file_extension = os.path.splitext(audio.filename)[1] if audio.filename else ".webm"
+        tmp_file_path = None
         
-        if is_vercel:
-            # Vercel: Use in-memory BytesIO (no filesystem access needed)
-            from io import BytesIO
-            audio_file_obj = BytesIO(content)
-            audio_file_obj.name = audio.filename or "audio.webm"
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+                tmp_file.write(content)
+                tmp_file_path = tmp_file.name
             
-            # Transcribe using OpenAI Whisper (accepts file-like objects)
-            transcript = technical_interview_engine.client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file_obj,
-                language="en"
-            )
+            # Transcribe using OpenAI Whisper
+            with open(tmp_file_path, "rb") as audio_file:
+                transcript = technical_interview_engine.client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="en"
+                )
             
             text = transcript.text
             return {"text": text, "language": "en"}
-        else:
-            # Localhost: Use tempfile (has filesystem access)
-            file_extension = os.path.splitext(audio.filename)[1] if audio.filename else ".webm"
-            tmp_file_path = None
             
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-                    tmp_file.write(content)
-                    tmp_file_path = tmp_file.name
-                
-                # Transcribe using OpenAI Whisper
-                with open(tmp_file_path, "rb") as audio_file:
-                    transcript = technical_interview_engine.client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        language="en"
-                    )
-                
-                text = transcript.text
-                return {"text": text, "language": "en"}
-                
-            finally:
-                # Clean up temporary file
-                if tmp_file_path and os.path.exists(tmp_file_path):
-                    try:
-                        os.unlink(tmp_file_path)
-                    except Exception as e:
-                        logger.warning(f"[SPEECH][SPEECH-TO-TEXT] Could not delete temp file: {str(e)}")
+        finally:
+            # Clean up temporary file
+            if tmp_file_path and os.path.exists(tmp_file_path):
+                try:
+                    os.unlink(tmp_file_path)
+                except Exception as e:
+                    logger.warning(f"[SPEECH][SPEECH-TO-TEXT] Could not delete temp file: {str(e)}")
         
     except HTTPException:
         raise
@@ -96,34 +75,7 @@ async def speech_to_text(
         raise HTTPException(status_code=500, detail=f"Error converting speech to text: {str(e)}")
 
 
-@router.options("/text-to-speech")
-async def text_to_speech_options():
-    """Handle CORS preflight requests for TTS endpoint"""
-    from fastapi.responses import Response
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "3600"
-        }
-    )
-
-
-@router.options("/generate-audio")
-async def generate_audio_options():
-    """Handle CORS preflight requests for generate-audio endpoint"""
-    from fastapi.responses import Response
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "3600"
-        }
-    )
+# OPTIONS endpoints removed - CORS is handled by FastAPI CORS middleware in app/main.py
 
 
 @router.post("/text-to-speech", responses={200: {"content": {"audio/mpeg": {}}}})
@@ -206,22 +158,6 @@ async def text_to_speech(
         raise HTTPException(status_code=500, detail=f"Error converting text to speech: {str(e)}")
 
 
-@router.post("/generate-audio", responses={200: {"content": {"audio/mpeg": {}}}})
-async def generate_audio(
-    http_request: Request,
-    request_body: Dict[str, Any] = Body(...),
-    supabase: Client = Depends(get_supabase_client),
-    _: None = Depends(validate_request_size)
-):
-    """
-    Generate audio from text using OpenAI TTS (alias for text-to-speech)
-    Accepts: {"text": "question text"}
-    Returns audio file as streaming response
-    This endpoint uses TECH_BACKEND_URL environment variable for deployment flexibility
-    """
-    # Delegate to text_to_speech function
-    return await text_to_speech(http_request, request_body, supabase, _)
-
 
 @router.get("/text-to-speech", responses={200: {"content": {"audio/mpeg": {}}}})
 async def text_to_speech_get(
@@ -297,11 +233,38 @@ async def text_to_speech_get(
                 detail=f"Failed to generate speech: {str(tts_error)}"
             )
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"[SPEECH][TEXT-TO-SPEECH] Unexpected error in text_to_speech_get: {str(e)}")
         import traceback
         logger.error(f"[SPEECH][TEXT-TO-SPEECH] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error converting text to speech: {str(e)}")
+
+
+@router.post("/generate-audio", responses={200: {"content": {"audio/mpeg": {}}}})
+async def generate_audio(
+    http_request: Request,
+    request_body: Dict[str, Any] = Body(...),
+    supabase: Client = Depends(get_supabase_client),
+    _: None = Depends(validate_request_size)
+):
+    """
+    Generate audio from text (Backward compatibility wrapper for text-to-speech)
+    Required to support existing frontend implementation.
+    DELEGATES to text_to_speech implementation.
+    """
+    try:
+        # Validate request body first
+        if not request_body or "text" not in request_body:
+            raise HTTPException(status_code=400, detail="text parameter is required")
+            
+        # Call the implementation directly
+        # Note: We pass the exact same arguments to ensure identical behavior
+        return await text_to_speech(http_request, request_body, supabase, _)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[SPEECH] Error in generate_audio wrapper: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 

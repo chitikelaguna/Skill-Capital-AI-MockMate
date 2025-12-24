@@ -33,26 +33,12 @@ def extract_file_extension(filename: str) -> str:
 async def save_temp_file(file_content: bytes, file_extension: str) -> str:
     """
     Save file content to temporary file
-    Works for both localhost and Vercel serverless (/tmp directory)
     Time Complexity: O(n) where n = file size (write operation)
     Space Complexity: O(n) - Temporary file on disk
     Returns: Path to temporary file
     """
-    # On Vercel, use /tmp directory (available in serverless functions)
-    # On localhost, use system temp directory
-    is_vercel = os.getenv("VERCEL") == "1" or os.getenv("VERCEL_URL") is not None
-    
-    if is_vercel:
-        # Vercel: Use /tmp directory explicitly
-        temp_file = tempfile.NamedTemporaryFile(
-            delete=False, 
-            suffix=file_extension, 
-            mode='wb',
-            dir="/tmp"
-        )
-    else:
-        # Localhost: Use system temp directory
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension, mode='wb')
+    # Use system temp directory
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension, mode='wb')
     
     try:
         temp_file.write(file_content)

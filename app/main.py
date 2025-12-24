@@ -125,70 +125,25 @@ async def health_check():
     Time Complexity: O(1)
     Space Complexity: O(1)
     """
+    # Check database connection status
+    db_status = "unknown"
+    try:
+        from app.db.client import get_supabase_client
+        if settings.supabase_url and settings.supabase_service_key:
+            supabase = get_supabase_client()
+            # Perform a simple query: select 1 row from user_profiles
+            supabase.table("user_profiles").select("id").limit(1).execute()
+            db_status = "connected"
+        else:
+            db_status = "not_configured"
+    except Exception:
+        db_status = "disconnected"
+
     return {
         "status": "healthy",
-        "service": "Skill Capital AI MockMate Backend"
+        "service": "Skill Capital AI MockMate Backend",
+        "database": db_status
     }
-
-
-@app.get("/api/health/database", tags=["health"])
-async def database_health_check():
-    """
-    Database connection health check endpoint
-    Tests Supabase connection by performing a simple query
-    Returns: {status: 'connected'} when Supabase works, {status: 'failed'} when there's an issue
-    Time Complexity: O(1)
-    Space Complexity: O(1)
-    """
-    from app.db.client import get_supabase_client
-    
-    try:
-        # Check if environment variables are loaded
-        if not settings.supabase_url:
-            return {
-                "status": "failed",
-                "error": "SUPABASE_URL environment variable is not set"
-            }
-        
-        if not settings.supabase_service_key:
-            return {
-                "status": "failed",
-                "error": "SUPABASE_SERVICE_KEY environment variable is not set"
-            }
-        
-        # Test connection by performing a simple query
-        try:
-            supabase = get_supabase_client()
-            
-            # Perform a simple query: select 1 row from user_profiles
-            test_response = supabase.table("user_profiles").select("id").limit(1).execute()
-            
-            # If we get here, connection is working
-            return {
-                "status": "connected",
-                "message": "Supabase connection successful",
-                "tables_tested": 1
-            }
-            
-        except ValueError as ve:
-            # Configuration error (missing credentials, invalid URL, etc.)
-            return {
-                "status": "failed",
-                "error": f"Configuration error: {str(ve)}"
-            }
-        except Exception as conn_error:
-            # Connection or query error
-            return {
-                "status": "failed",
-                "error": f"Connection failed: {str(conn_error)}"
-            }
-            
-    except Exception as e:
-        # Unexpected error
-        return {
-            "status": "failed",
-            "error": f"Health check failed: {str(e)}"
-        }
 
 # Configure CORS with dynamic origins
 # For development, allow all origins without credentials for maximum compatibility
@@ -226,24 +181,21 @@ async def get_frontend_config(request: Request):
     supabase_key = settings.supabase_key or ""
     
     # Determine API base URL dynamically based on environment
-    # CRITICAL: Always return the BACKEND URL, not the frontend URL
-    # Priority: TECH_BACKEND_URL > VERCEL_URL > Backend host:port (for local dev)
-    # NOTE: We do NOT use FRONTEND_URL because it might be wrong (e.g., localhost:3000)
+    # Priority: TECH_BACKEND_URL > Backend host:port
     api_base_url = None
     
-    # Priority 1: Use TECH_BACKEND_URL if explicitly set (for separate backend deployment)
+    # Priority 1: Use TECH_BACKEND_URL if explicitly set
     if settings.tech_backend_url:
         api_base_url = settings.tech_backend_url.rstrip('/')
-    elif settings.vercel_url:
-        # Vercel provides VERCEL_URL (e.g., "your-app.vercel.app")
-        # On Vercel, frontend and backend are on the same domain
-        api_base_url = f"https://{settings.vercel_url}"
     else:
-        # Local development: Always use backend URL (127.0.0.1:8000)
-        # CRITICAL: Always use 127.0.0.1:8000, never use request port (could be 3000, etc.)
-        # Don't use request.host, request.url.hostname, or settings.frontend_url
-        # because those might be the frontend port (3000) or wrong hostname
-        api_base_url = f"http://127.0.0.1:{settings.backend_port}"
+        # Local/Render: Always use backend address
+        # CRITICAL: Always use 127.0.0.1:8000 for local, or configured host/port
+        if settings.environment == "development":
+             api_base_url = f"http://127.0.0.1:{settings.backend_port}"
+        else:
+             # For production (Render), rely on TECH_BACKEND_URL or external URL
+             api_base_url = settings.tech_backend_url or f"http://0.0.0.0:{settings.backend_port}"
+
     
     # Check if values are actually set (not just empty strings)
     if not supabase_url.strip() or not supabase_key.strip():

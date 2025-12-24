@@ -44,11 +44,6 @@ logger = logging.getLogger("hr_interview")
 router = APIRouter(prefix="/hr", tags=["hr-interview"])
 
 
-@router.get("/_health")
-async def hr_health():
-    return {"ok": True}
-
-
 @router.post("/start", response_model=HRInterviewStartResponse)
 async def start_hr_interview(
     http_request: Request,
