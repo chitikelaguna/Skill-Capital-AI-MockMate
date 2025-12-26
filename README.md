@@ -129,38 +129,197 @@
 ### High-Level Architecture
 
 The system follows a clean architecture with clear separation of concerns:
-
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Frontend Client (Browser)                 │
 │              HTML/CSS/JavaScript + Chart.js                 │
 └───────────────────────┬─────────────────────────────────────┘
-                         │
-                         │ HTTP/REST API
-                         │
+                        │
+                        │ HTTP/REST API
+                        │
 ┌────────────────────────▼─────────────────────────────────────┐
 │                    FastAPI Backend                           │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
 │  │ Profile Router│  │Interview Router│ │Dashboard Router│   │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │Technical Router│ │Coding Router │  │HR/STAR Routers│    │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
 └────────────────────────┬─────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         │               │               │
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
 ┌────────▼────┐  ┌───────▼──────┐  ┌─────▼──────┐
 │   Services   │  │   Services   │  │  Services  │
 │ Resume Parser│  │  Question    │  │  Answer   │
 │              │  │  Generator    │  │ Evaluator  │
 └────────┬─────┘  └───────┬──────┘  └─────┬──────┘
-         │                │               │
-         └───────────────┬────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         │               │               │
+        │                │               │
+        └───────────────┬────────────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        │               │               │
 ┌────────▼────┐  ┌───────▼──────┐  ┌─────▼──────┐
 │   OpenAI    │  │   LangChain   │  │  Supabase  │
-│    API      │  │   Framework   │  │ PostgreSQL │
+│GPT-3.5/4 API│  │   Framework   │  │ PostgreSQL │
+│Whisper+TTS  │  │               │  │  + Storage │
 └─────────────┘  └───────────────┘  └────────────┘
+```
+
+### Complete User Workflow
+
+#### 1️⃣ Resume Upload & Analysis Flow
+
+```
+User Dashboard → Click "Upload Resume"
+                ↓
+         Upload PDF/DOCX
+                ↓
+Backend Processing (5-10 min on Render free tier):
+├─> Extract text with PyMuPDF/pdfplumber
+├─> Parse resume data (name, email, skills, experience)
+├─> Extract projects and keywords (regex-based)
+├─> Generate enhanced summary (CPU-intensive, NO OpenAI)
+├─> Upload to Supabase storage
+└─> Store profile in user_profiles table
+                ↓
+Display Results:
+├─> Personal information
+├─> Extracted skills (tags)
+├─> Enhanced summary
+├─> Projects summary
+└─> Interview module cards (4 types)
+```
+
+#### 2️⃣ Technical Interview Flow
+
+```
+Start Technical Interview
+        ↓
+POST /api/interview/technical/start
+├─> Create session in technical_round table
+└─> Generate first question (OpenAI GPT-3.5/4)
+        ↓
+Play Question Audio (auto-play)
+        ↓
+User Records Answer (Web Speech API)
+        ↓
+POST /api/interview/technical/{session_id}/submit-answer
+├─> Convert speech to text (OpenAI Whisper)
+├─> Evaluate answer with AI (OpenAI GPT)
+│   └─> Returns: score (0-100), feedback, next question
+├─> Store in database
+└─> Convert feedback to speech (TTS)
+        ↓
+Display Immediate Feedback:
+├─> Score badge (color-coded)
+├─> Play feedback audio
+└─> Show next question
+        ↓
+Repeat 3-4 until 5-10 questions answered
+        ↓
+End Interview → Generate Summary → Display Results
+```
+
+#### 3️⃣ HR Interview Flow
+
+```
+Same as Technical Interview:
+- Pre-generated HR-focused questions
+- Voice interaction (speech-to-text + TTS)
+- Real-time AI evaluation after each answer
+- Stored in hr_round table
+- Immediate feedback display
+```
+
+#### 4️⃣ Coding Interview Flow
+
+```
+Start Coding Interview
+        ↓
+POST /api/interview/coding/start
+├─> Create session in coding_round table
+└─> Generate coding question (difficulty-based)
+        ↓
+User Writes Code in Browser Editor
+├─> Syntax highlighting
+├─> Language selection (Python/Java/C/C++)
+└─> Can run code to test (Piston API)
+        ↓
+Submit Code
+POST /api/interview/coding/{session_id}/next
+├─> Execute code with ALL test cases (Piston API)
+├─> Compare output with expected (normalized)
+├─> Calculate score: passed_tests / total_tests * 100
+├─> AI evaluation (if partial pass):
+│   └─> OpenAI evaluates code quality + logic
+└─> Store code, test results, score
+        ↓
+Display Results:
+├─> Test case pass/fail breakdown
+├─> Execution time
+├─> Code quality feedback
+└─> Next question or completion
+        ↓
+Repeat for 3-5 questions
+        ↓
+End Interview → Calculate Average → Show Final Results
+```
+
+#### 5️⃣ STAR Behavioral Interview Flow
+
+```
+Start STAR Interview
+        ↓
+POST /api/interview/star/start
+└─> Generate behavioral questions (STAR method focus)
+        ↓
+User Provides Structured Answer:
+├─> Situation (what was the context?)
+├─> Task (what needed to be done?)
+├─> Action (what did you do?)
+└─> Result (what was the outcome?)
+        ↓
+POST /api/interview/star/{session_id}/submit-answer
+├─> AI evaluates each STAR component separately:
+│   ├─> Situation clarity score (0-100)
+│   ├─> Task definition score (0-100)
+│   ├─> Action detail score (0-100)
+│   └─> Result impact score (0-100)
+├─> Overall score = average of 4 components
+└─> Store in star_round table
+        ↓
+Display Component Scores + Feedback
+        ↓
+Repeat for 5-7 questions
+        ↓
+End Interview → Generate STAR Breakdown → Show Radar Chart
+```
+
+#### 6️⃣ Dashboard & Analytics
+
+```
+GET /api/dashboard/performance/{user_id}
+↓
+Aggregate data from all interview tables:
+├─> technical_round
+├─> coding_round
+├─> hr_round
+└─> star_round
+↓
+Calculate Metrics:
+├─> Total interviews completed
+├─> Average score across all types
+├─> Completion rate
+├─> Top 3 strong skills
+├─> Top 3 weak areas
+└─> Recent interview history
+↓
+Display Dashboard (Chart.js):
+├─> Score trend line chart
+├─> Skills radar chart
+├─> Interview type breakdown (pie chart)
+└─> Recent interviews table
 ```
 
 ### Data Flow
@@ -170,7 +329,44 @@ The system follows a clean architecture with clear separation of concerns:
 3. **Answer Submission**: User submits answer → Evaluated by AI → Scores calculated → Stored in database
 4. **Interview Completion**: All answers aggregated → Final evaluation generated → Dashboard updated
 
-For detailed architecture diagrams, see [`architecture.tex`](architecture.tex) (LaTeX document with TikZ diagrams).
+### Voice Interaction Flow
+
+```
+Question Text (Database)
+        ↓
+GET /api/interview/text-to-speech?text=...
+        ↓
+OpenAI TTS API → Audio URL
+        ↓
+Frontend plays audio (HTML5 Audio API)
+        ↓
+User speaks → Record audio blob
+        ↓
+POST /api/interview/speech-to-text + audio file
+        ↓
+OpenAI Whisper API → Text transcription
+        ↓
+Process as normal text answer
+```
+
+### Code Execution Flow
+
+```
+User Code (Python/Java/C/C++)
+        ↓
+POST /api/interview/coding/run
+        ↓
+Piston API (https://emkc.org/api/v2/piston)
+├─> Remote code execution sandbox
+├─> Run with test cases
+└─> Returns: output, execution time, errors
+        ↓
+Compare output with expected
+        ↓
+Pass/Fail decision + Score calculation
+```
+
+For detailed workflow diagrams, see [`project-workflow-documentation.md`](project-workflow-documentation.md).
 
 ---
 

@@ -34,49 +34,6 @@ let currentQuestion = null;
 let interviewActive = false;
 let currentAudio = null; // Track current audio playback to prevent overlap
 let isAudioPlaying = false; // Track if audio is currently playing
-let hrAudioQueue = []; // Queue for HR interview audio (follow-up → question sequence)
-let currentHRAudio = null; // Global HR audio manager - ONLY ONE audio can exist at a time
-
-// Simple FIFO queue for HR interview audio to ensure sequential playback
-function enqueueHRAudio(audioUrlOrText) {
-    if (!audioUrlOrText) {
-        return;
-    }
-    console.log('[HR INTERVIEW TTS] Enqueue audio:', String(audioUrlOrText).substring(0, 80) + '...');
-    hrAudioQueue.push(audioUrlOrText);
-
-    // If nothing is currently playing, start immediately
-    if (!isAudioPlaying) {
-        playNextFromHRAudio();
-    }
-}
-
-function playNextFromHRAudio() {
-    // ✅ CRITICAL: Check both isAudioPlaying AND currentHRAudio to ensure no overlap
-    if (isAudioPlaying || currentHRAudio !== null) {
-        console.log('[HR INTERVIEW TTS] ⏸️ Cannot play next audio - current audio still active');
-        console.debug('[HR INTERVIEW TTS] isAudioPlaying:', isAudioPlaying);
-        console.debug('[HR INTERVIEW TTS] currentHRAudio exists:', currentHRAudio !== null);
-        // Current audio still playing; wait for onended/onerror to advance the queue
-        return;
-    }
-    if (hrAudioQueue.length === 0) {
-        console.log('[HR INTERVIEW TTS] ✅ Queue is empty, no more audio to play');
-        return;
-    }
-
-    const next = hrAudioQueue.shift();
-    console.log('[HR INTERVIEW TTS] ========== DEQUEUE AND PLAY NEXT AUDIO ==========');
-    console.log('[HR INTERVIEW TTS] Dequeue and play next audio:', String(next).substring(0, 80) + '...');
-    console.log('[HR INTERVIEW TTS] Queue remaining items:', hrAudioQueue.length);
-
-    // Fire-and-forget; playAudio will manage onended/onerror and will call playNextFromHRAudio when done
-    playAudio(next).catch(err => {
-        console.warn('[HR INTERVIEW TTS] Queue item playback failed:', err);
-        // Move on to the next item to avoid getting stuck
-        setTimeout(() => playNextFromHRAudio(), 100);
-    });
-}
 
 // Loading state management to prevent double submission
 let isLoading = {
@@ -91,15 +48,15 @@ let isLoading = {
 async function getCurrentUser() {
     try {
         // First, try to get from localStorage (persistent) or sessionStorage
-        const storedUserId = localStorage.getItem('user_id') || 
-                            sessionStorage.getItem('resume_user_id') || 
-                            window.CURRENT_USER_ID;
+        const storedUserId = localStorage.getItem('user_id') ||
+            sessionStorage.getItem('resume_user_id') ||
+            window.CURRENT_USER_ID;
         if (storedUserId) {
             currentUserId = storedUserId;
             window.CURRENT_USER_ID = storedUserId;
             return { user_id: storedUserId };
         }
-        
+
         // If not in storage, fetch from API
         const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
         const res = await fetch(`${API_BASE}/api/profile/current`).catch(networkError => {
@@ -111,21 +68,21 @@ async function getCurrentUser() {
         }
         const user = await res.json();
         currentUserId = user.user_id;
-        
+
         // Store in both localStorage (persistent) and sessionStorage
         if (currentUserId) {
             localStorage.setItem('user_id', currentUserId);
             sessionStorage.setItem('resume_user_id', currentUserId);
             window.CURRENT_USER_ID = currentUserId;
         }
-        
+
         return user;
     } catch (e) {
         console.error('Error getting current user:', e);
         // Try one more fallback: check storage
-        const fallbackUserId = localStorage.getItem('user_id') || 
-                               sessionStorage.getItem('resume_user_id') || 
-                               window.CURRENT_USER_ID;
+        const fallbackUserId = localStorage.getItem('user_id') ||
+            sessionStorage.getItem('resume_user_id') ||
+            window.CURRENT_USER_ID;
         if (fallbackUserId) {
             currentUserId = fallbackUserId;
             window.CURRENT_USER_ID = fallbackUserId;
@@ -175,22 +132,22 @@ async function init() {
             interviewSection: !!interviewSection,
             pageType: setupSection ? 'guidelines' : 'execution'
         });
-        
+
         // Only hide setupSection if it exists (guidelines page)
         if (setupSection) {
             setupSection.classList.add('hidden');
         }
-        
+
         // Ensure interviewSection is visible (execution page)
         if (interviewSection) {
             interviewSection.classList.remove('hidden');
         }
-        
+
         // Get current user first
         console.log("[HR INTERVIEW] Getting current user...");
         await getCurrentUser();
         console.log("[HR INTERVIEW] Current user ID:", currentUserId);
-        
+
         // Setup event listeners
         setupEventListeners();
 
@@ -219,7 +176,7 @@ async function init() {
                 </div>
             `;
         } else {
-        alert(`Error: ${e.message}`);
+            alert(`Error: ${e.message}`);
         }
     }
 }
@@ -227,32 +184,32 @@ async function init() {
 function setupEventListeners() {
     // ✅ CRITICAL: All event listeners are defensive - elements may not exist at init time
     // Interview auto-starts on page load, so button listeners are optional
-    
+
     // Start Interview button (optional - interview auto-starts anyway)
     const startBtn = document.getElementById('startInterviewBtn');
     if (startBtn) {
         startBtn.addEventListener('click', startInterview);
     }
-    
+
     // End Interview button (only exists when interview is active)
     const endBtn = document.getElementById('endInterviewBtn');
     if (endBtn) {
         endBtn.addEventListener('click', endInterview);
     }
-    
+
     // Voice recording button (only exists when interview is active)
     const voiceBtn = document.getElementById('voiceButton');
     if (voiceBtn) {
         voiceBtn.addEventListener('click', toggleRecording);
     }
-    
+
     // Restart Interview button (only exists in feedback section)
     const restartBtn = document.getElementById('restartInterviewBtn');
     if (restartBtn) {
         restartBtn.addEventListener('click', () => {
-        window.location.reload();
-    });
-}
+            window.location.reload();
+        });
+    }
 }
 
 // Auto-hides after specified duration (default 4s for errors)
@@ -262,7 +219,7 @@ function showToast(message, type = 'error', duration = 4000) {
     if (existingToast) {
         existingToast.remove();
     }
-    
+
     // Create toast element
     const toast = document.createElement('div');
     toast.id = 'hrToast';
@@ -282,7 +239,7 @@ function showToast(message, type = 'error', duration = 4000) {
         animation: slideIn 0.3s ease;
     `;
     toast.textContent = message;
-    
+
     // Add animation
     const style = document.createElement('style');
     style.textContent = `
@@ -295,9 +252,9 @@ function showToast(message, type = 'error', duration = 4000) {
         style.id = 'hrToastStyle';
         document.head.appendChild(style);
     }
-    
+
     document.body.appendChild(toast);
-    
+
     // Auto-remove after duration
     setTimeout(() => {
         toast.style.animation = 'slideIn 0.3s ease reverse';
@@ -312,21 +269,21 @@ function showToast(message, type = 'error', duration = 4000) {
 async function startInterview() {
     console.log("[HR INTERVIEW] ✅ startInterview() function executing");
     try {
-    // Ensure we have current user
-    if (!currentUserId) {
+        // Ensure we have current user
+        if (!currentUserId) {
             console.log("[HR INTERVIEW] currentUserId missing, fetching user...");
-        await getCurrentUser();
-    }
-    
-    // Validate userId is available
-    if (!currentUserId) {
+            await getCurrentUser();
+        }
+
+        // Validate userId is available
+        if (!currentUserId) {
             const errorMsg = 'userId is not defined. Please ensure you have uploaded a resume and have a valid user profile.';
             console.error('[HR INTERVIEW] ❌ Start error:', errorMsg);
             console.error('[HR INTERVIEW] currentUserId is:', currentUserId);
             alert('Failed to start HR interview. Check console.');
             throw new Error(errorMsg);
         }
-        
+
         // ✅ CRITICAL: Verify api-config.js is loaded before making API call
         if (typeof getApiBase !== 'function') {
             const errorMsg = 'api-config.js not loaded. getApiBase() is not available.';
@@ -336,7 +293,7 @@ async function startInterview() {
             alert('Configuration error: API config not loaded. Please refresh the page.');
             throw new Error(errorMsg);
         }
-        
+
         // ✅ CRITICAL: Log API call details before making request
         const apiBase = getApiBase();
         const apiUrl = `${apiBase}/api/interview/hr/start`;
@@ -348,12 +305,12 @@ async function startInterview() {
             apiBase: apiBase,
             getApiBaseAvailable: typeof getApiBase === 'function'
         });
-        
+
         let response;
         try {
             response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             console.log("[HR INTERVIEW] ✅ API call completed:", {
@@ -372,7 +329,7 @@ async function startInterview() {
             alert('Failed to start HR interview. Check console.');
             throw new Error(`Network error: ${fetchError.message || 'Unable to connect to server'}`);
         }
-        
+
         if (!response.ok) {
             // ✅ CRITICAL: Fail-fast on non-OK responses (matches Technical Interview pattern)
             const errorText = await response.text();
@@ -395,10 +352,10 @@ async function startInterview() {
             alert('Failed to start HR interview. Check console.');
             throw new Error('Invalid response format from server');
         }
-        
+
         // ✅ CRITICAL: Log the response (matches Technical Interview pattern)
         console.log("HR start response:", data);
-        
+
         // ✅ CRITICAL: Validate session_id is present (matches Technical Interview pattern)
         if (!data.session_id) {
             const errorMsg = 'Session ID missing from response. Please try again.';
@@ -406,7 +363,7 @@ async function startInterview() {
             alert('Failed to start HR interview. Check console.');
             throw new Error(errorMsg);
         }
-        
+
         interviewSessionId = data.session_id;
         interviewActive = true;
         conversationHistory = [];  // Start with empty history (like Technical Interview)
@@ -429,18 +386,18 @@ async function startInterview() {
             statusEl.textContent = 'Interview Active';
             statusEl.classList.add('active');
         }
-        
+
         // Clear container and prepare for messages
         const container = document.getElementById('conversationContainer');
         if (container) {
-        container.innerHTML = '';
+            container.innerHTML = '';
         }
 
         // ✅ CONVERSATIONAL FLOW: Display first question if available (like Technical Interview)
         // Normalize response: support both 'question' and 'first_question' fields
         const firstQuestion = data.question || data.first_question;
         const audioUrl = data.audio_url;
-        
+
         if (firstQuestion) {
             currentQuestion = firstQuestion;
             conversationHistory.push({
@@ -450,12 +407,12 @@ async function startInterview() {
             });
             // Display question with audio URL
             displayMessage('ai', firstQuestion, audioUrl);
-            
+
             // Play audio if available (matches Technical Interview pattern)
             if (audioUrl) {
                 setTimeout(() => {
-                    enqueueHRAudio(audioUrl).catch(err => {
-                        // Audio playback failed, manual play button will be shown
+                    playAudio(audioUrl).catch(err => {
+                        console.warn('[HR INTERVIEW] Audio playback failed:', err);
                     });
                 }, 100);
             } else {
@@ -469,10 +426,10 @@ async function startInterview() {
         // ✅ CRITICAL: Fail-fast error handling (matches Technical Interview pattern)
         console.error('[HR INTERVIEW] Start error:', error);
         console.error('[HR INTERVIEW] Error stack:', error.stack);
-            
+
         // Show user-visible alert
         alert('Failed to start HR interview. Check console.');
-        
+
         // Display error in UI (matches Technical Interview pattern)
         document.getElementById('setupSection').innerHTML = `
             <div class="error-message">
@@ -492,7 +449,7 @@ window.startInterview = startInterview; // Also expose as startInterview for com
 
 async function toggleRecording() {
     if (!interviewActive) return;
-    
+
     // Prevent recording while audio is playing (same as technical interview behavior)
     if (isAudioPlaying) {
         console.log('[HR INTERVIEW] Cannot record while audio is playing');
@@ -519,29 +476,29 @@ async function startRecording() {
 
         mediaRecorder.onstop = async () => {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            
+
             // ✅ If user clicked record but did not speak, treat as 'No Answer'
             if (audioBlob.size === 0) {
                 const noAnswerText = 'No Answer';
                 document.getElementById('voiceStatus').textContent = 'No answer captured. Sending "No Answer".';
-                
+
                 // Display 'No Answer' as the user's response
                 displayMessage('user', noAnswerText);
                 conversationHistory.push({
                     role: 'user',
                     content: noAnswerText
                 });
-                
+
                 // Submit 'No Answer' to the backend
                 await submitAnswer(noAnswerText);
-                
+
                 // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
                 return;
             }
-            
+
             await processAudioAnswer(audioBlob);
-            
+
             // Stop all tracks
             stream.getTracks().forEach(track => track.stop());
         };
@@ -578,10 +535,10 @@ function detectNoAnswer(sttText) {
     if (!sttText || !sttText.trim()) {
         return { isNoAnswer: true, reason: 'empty_or_whitespace' };
     }
-    
+
     const trimmed = sttText.trim();
     const upper = trimmed.toUpperCase();
-    
+
     // List of known garbage phrases (case-insensitive)
     const garbagePhrases = [
         'THANK YOU',
@@ -594,14 +551,14 @@ function detectNoAnswer(sttText) {
         'THANK YOU FOR WATCHING!',
         'THANKS FOR WATCHING!'
     ];
-    
+
     // Check for exact garbage phrase matches
     for (const phrase of garbagePhrases) {
         if (upper === phrase || upper.startsWith(phrase + ' ') || upper.endsWith(' ' + phrase)) {
             return { isNoAnswer: true, reason: `garbage_phrase: ${trimmed}` };
         }
     }
-    
+
     // Check for single-word fillers with no semantic content
     const words = trimmed.split(/\s+/);
     if (words.length === 1) {
@@ -612,12 +569,12 @@ function detectNoAnswer(sttText) {
             return { isNoAnswer: true, reason: `single_word_filler: ${trimmed}` };
         }
     }
-    
+
     // Very short responses (less than 3 characters) are likely not real answers
     if (trimmed.length < 3) {
         return { isNoAnswer: true, reason: `too_short: ${trimmed}` };
     }
-    
+
     // ✅ FIX: Detect hallucinated/irrelevant answers that are clearly not interview responses
     // These are answers that don't relate to interview questions at all
     const hallucinatedPatterns = [
@@ -649,14 +606,14 @@ function detectNoAnswer(sttText) {
         /is this working/i,
         /microphone test/i
     ];
-    
+
     // Check if answer matches any hallucinated pattern
     for (const pattern of hallucinatedPatterns) {
         if (pattern.test(trimmed)) {
             return { isNoAnswer: true, reason: `hallucinated_pattern: ${trimmed}` };
         }
     }
-    
+
     // ✅ FIX: Detect URLs, website references, and other clearly irrelevant text
     // Check for URL patterns (www., http://, https://, .com, .co.uk, .org, etc.)
     const urlPatterns = [
@@ -674,13 +631,13 @@ function detectNoAnswer(sttText) {
         /subtitle/i,
         /caption/i
     ];
-    
+
     for (const pattern of urlPatterns) {
         if (pattern.test(trimmed)) {
             return { isNoAnswer: true, reason: `url_or_website_reference: ${trimmed}` };
         }
     }
-    
+
     // ✅ FIX: Detect answers that are clearly not related to interview context
     // If answer contains phrases that suggest it's not an interview answer
     const irrelevantPhrases = [
@@ -705,7 +662,7 @@ function detectNoAnswer(sttText) {
         'website',
         'url'
     ];
-    
+
     const lowerTrimmed = trimmed.toLowerCase();
     // If answer contains multiple irrelevant phrases, it's likely hallucinated
     let irrelevantCount = 0;
@@ -714,19 +671,19 @@ function detectNoAnswer(sttText) {
             irrelevantCount++;
         }
     }
-    
+
     // If answer contains 2+ irrelevant phrases, classify as "No Answer"
     if (irrelevantCount >= 2) {
         return { isNoAnswer: true, reason: `multiple_irrelevant_phrases: ${trimmed}` };
     }
-    
+
     // ✅ FIX: STRICT RULE - Detect parenthetical descriptions FIRST (highest priority)
     // These are clearly not interview answers - they describe background audio
     // Check for various parenthetical patterns - if text contains (* or *) or starts with ( or *
-    if (trimmed.startsWith('(*') || 
-        trimmed.startsWith('(') || 
+    if (trimmed.startsWith('(*') ||
+        trimmed.startsWith('(') ||
         trimmed.startsWith('*') ||
-        trimmed.includes('(*') || 
+        trimmed.includes('(*') ||
         trimmed.includes('*)') ||
         trimmed.includes('( *') ||
         trimmed.includes('* )') ||
@@ -735,13 +692,13 @@ function detectNoAnswer(sttText) {
         /\([^)]*[Ss]ong|[Mm]usic|[Ss]ound|[Aa]udio|[Pp]laying[^)]*\)/i.test(trimmed)) {
         return { isNoAnswer: true, reason: `parenthetical_description: ${trimmed}` };
     }
-    
+
     // ✅ FIX: Detect single irrelevant phrase if it's clearly not an answer
     // If answer contains "subs by" or similar, it's definitely not an interview answer
     if (lowerTrimmed.includes('subs by') || lowerTrimmed.includes('subtitle') || lowerTrimmed.includes('caption')) {
         return { isNoAnswer: true, reason: `subtitle_or_caption_text: ${trimmed}` };
     }
-    
+
     // ✅ FIX: Detect answers that describe what's happening rather than answering the question
     // If text contains words that describe actions/events rather than personal information
     const descriptivePhrases = [
@@ -756,46 +713,46 @@ function detectNoAnswer(sttText) {
         'twinkle',
         'peel'
     ];
-    
+
     let descriptiveCount = 0;
     for (const phrase of descriptivePhrases) {
         if (lowerTrimmed.includes(phrase)) {
             descriptiveCount++;
         }
     }
-    
+
     // If answer contains 2+ descriptive phrases about audio/music, it's not an interview answer
     if (descriptiveCount >= 2) {
         return { isNoAnswer: true, reason: `audio_description_text: ${trimmed}` };
     }
-    
+
     // ✅ FIX: STRICT RULE - Detect answers that are clearly describing background content
     // If answer contains "playing" + any music/song reference, it's describing audio, not answering
     // Also check for positional patterns (starts/ends with "playing") and specific phrases
     if (lowerTrimmed.includes('background music') || lowerTrimmed.includes('background sound')) {
         return { isNoAnswer: true, reason: `background_audio_description: ${trimmed}` };
     }
-    
+
     // Check for "playing" combined with music/audio words, or positional patterns
-    if (lowerTrimmed.includes('playing') && 
-        (lowerTrimmed.includes('song') || lowerTrimmed.includes('music') || 
-         lowerTrimmed.includes('sound') || lowerTrimmed.includes('audio'))) {
+    if (lowerTrimmed.includes('playing') &&
+        (lowerTrimmed.includes('song') || lowerTrimmed.includes('music') ||
+            lowerTrimmed.includes('sound') || lowerTrimmed.includes('audio'))) {
         return { isNoAnswer: true, reason: `background_audio_description: ${trimmed}` };
     }
-    
+
     // Check for text that ends with "playing" or starts with "playing" (describing audio)
     if (lowerTrimmed.endsWith(' playing') || lowerTrimmed.startsWith('playing ')) {
         return { isNoAnswer: true, reason: `background_audio_description: ${trimmed}` };
     }
-    
+
     // ✅ FIX: STRICT RULE - If answer contains song title patterns, it's not an interview answer
     // Common patterns: "twinkle", "star", "peel" (from song titles), etc.
-    if (lowerTrimmed.includes('twinkle') || 
+    if (lowerTrimmed.includes('twinkle') ||
         (lowerTrimmed.includes('star') && lowerTrimmed.includes('little')) ||
         (lowerTrimmed.includes('foot') && lowerTrimmed.includes('peel'))) {
         return { isNoAnswer: true, reason: `song_title_reference: ${trimmed}` };
     }
-    
+
     // ✅ FIX: Detect answers that don't contain any interview-relevant keywords
     // If answer is long enough but doesn't contain any professional/personal keywords, it might be irrelevant
     const interviewKeywords = [
@@ -803,7 +760,7 @@ function detectNoAnswer(sttText) {
         'job', 'career', 'education', 'degree', 'company', 'team', 'work', 'professional', 'background',
         'strength', 'weakness', 'goal', 'interest', 'motivation', 'hire', 'position', 'role'
     ];
-    
+
     // Only apply this check for longer answers (more than 20 characters)
     // Short answers might be valid (e.g., "Yes", "No", "I agree")
     if (trimmed.length > 20) {
@@ -814,13 +771,13 @@ function detectNoAnswer(sttText) {
                 break;
             }
         }
-        
+
         // If long answer has no interview keywords AND contains descriptive/audio words, it's likely irrelevant
         if (!hasInterviewKeyword && descriptiveCount >= 1) {
             return { isNoAnswer: true, reason: `no_interview_relevance: ${trimmed}` };
         }
     }
-    
+
     return { isNoAnswer: false, reason: null };
 }
 
@@ -847,15 +804,15 @@ async function processAudioAnswer(audioBlob) {
 
         const sttData = await sttResponse.json();
         let rawUserAnswer = sttData.text || sttData.transcript || ''; // Use a temporary variable for clarity
-        
+
         // ✅ If user did not speak or transcription is empty, treat as 'No Answer'
         if (!rawUserAnswer || rawUserAnswer.trim() === '') {
             rawUserAnswer = 'No Answer';
         }
-        
+
         // ✅ FIX: Detect "No Answer" cases (empty, garbage phrases, low confidence)
         const noAnswerCheck = detectNoAnswer(rawUserAnswer);
-        
+
         let userAnswer;
         if (noAnswerCheck.isNoAnswer || rawUserAnswer === 'No Answer') {
             // Log the detection reason (debug level)
@@ -873,7 +830,7 @@ async function processAudioAnswer(audioBlob) {
 
     } catch (error) {
         console.error('Process audio error:', error);
-        
+
         // If STT fails completely, treat as "No Answer"
         console.log('[HR INTERVIEW] STT failed, treating as No Answer');
         const userAnswer = 'No Answer';
@@ -908,10 +865,10 @@ async function submitAnswer(answer) {
     try {
         setLoadingState('submitAnswer', true);
         console.log('[SUBMIT ANSWER] Submitting HR answer to backend...');
-        
+
         // Get API base URL using helper function
         const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
-        
+
         // Use HR-specific submit answer endpoint
         const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/submit-answer`, {
             method: 'POST',
@@ -942,12 +899,12 @@ async function submitAnswer(answer) {
             } catch (parseError) {
                 errorText = `HTTP ${response.status}`;
             }
-            
+
             const errorMsg = `Failed to submit answer: ${response.status} - ${errorText}`;
             console.error('[HR INTERVIEW] Submit answer error:', response.status, errorText);
             console.error('[HR INTERVIEW] Error data:', errorData);
             showToast(errorMsg, 'error');
-            
+
             const errorObj = {
                 message: errorMsg,
                 status: response.status,
@@ -958,7 +915,7 @@ async function submitAnswer(answer) {
         }
 
         const data = await response.json();
-        
+
         console.log('[SUBMIT ANSWER] ✅ HR answer submitted successfully');
         console.log('[SUBMIT ANSWER] HR scores:', {
             communication: data.scores?.communication,
@@ -967,7 +924,7 @@ async function submitAnswer(answer) {
             clarity: data.scores?.clarity,
             overall: data.scores?.overall
         });
-        
+
         // Update conversation history
         conversationHistory.push({
             role: 'user',
@@ -982,10 +939,12 @@ async function submitAnswer(answer) {
                 audio_url: data.audio_url
             });
             displayMessage('ai', data.ai_response, data.audio_url);
-            
+
             if (data.audio_url) {
-                console.log('[HR INTERVIEW] Enqueueing AI response audio:', data.audio_url);
-                enqueueHRAudio(data.audio_url);
+                console.log('[HR INTERVIEW] Playing AI response audio:', data.audio_url);
+                playAudio(data.audio_url).catch(err => {
+                    console.warn('[HR INTERVIEW] AI response audio playback failed:', err);
+                });
             }
         }
 
@@ -1016,7 +975,7 @@ async function submitAnswer(answer) {
             // Only show toast if not already shown (network errors already show toast)
             showToast(errorMessage, 'error');
         }
-        
+
         const errorObj = {
             message: errorMessage,
             status: error.status,
@@ -1045,28 +1004,28 @@ async function getNextHRQuestion(userAnswer = null) {
 
     try {
         setLoadingState('getNextQuestion', true);
-        
+
         // Hide loading message if still visible
         const loadingMsg = document.getElementById('loadingMessage');
         if (loadingMsg) {
             loadingMsg.classList.add('hidden');
         }
-        
+
         console.log('[HR INTERVIEW] Fetching next question from backend...');
         if (userAnswer) {
             console.log('[HR INTERVIEW] Sending user answer for context-aware question generation');
         }
-        
+
         // Get API base URL using helper function
         const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
-        
+
         // Call backend endpoint to get next AI-generated HR question
         // Send user_answer if provided so backend can save it and use it for context-aware generation
         const requestBody = {};
         if (userAnswer) {
             requestBody.user_answer = userAnswer;
         }
-        
+
         const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/next-question`, {
             method: 'POST',
             headers: {
@@ -1094,7 +1053,7 @@ async function getNextHRQuestion(userAnswer = null) {
             } catch (parseError) {
                 errorText = `HTTP ${response.status}`;
             }
-            
+
             const errorMsg = `Backend error: ${response.status} - ${errorText}`;
             console.error('[HR INTERVIEW] Get next question error:', response.status, errorText);
             console.error('[HR INTERVIEW] Error data:', errorData);
@@ -1103,7 +1062,7 @@ async function getNextHRQuestion(userAnswer = null) {
         }
 
         const data = await response.json();
-        
+
         // ✅ DEBUG: Log next-question response received
         console.debug('[HR DEBUG Q2+] ========== NEXT QUESTION RESPONSE RECEIVED ==========');
         console.debug('[HR DEBUG Q2+] Response status:', response.status);
@@ -1114,35 +1073,35 @@ async function getNextHRQuestion(userAnswer = null) {
         console.debug('[HR DEBUG Q2+] question_number:', data.question_number);
         console.debug('[HR DEBUG Q2+] Full response data:', JSON.stringify(data, null, 2));
         console.debug('[HR DEBUG Q2+] ====================================================');
-        
+
         // Check if interview is completed
         if (data.interview_completed) {
             console.log('[HR INTERVIEW] Interview completed:', data.message);
             await completeInterview();
             return;
         }
-        
+
         // Extract question data from response
         const nextQuestion = data.question;
         const audioUrl = data.audio_url || data.audioUrl; // Try both possible field names
         const questionNumber = data.question_number || conversationHistory.filter(m => m.role === 'ai').length + 1;
-        
+
         // ✅ DEBUG: Log extracted values
         console.debug('[HR DEBUG Q2+] Extracted nextQuestion:', nextQuestion ? nextQuestion.substring(0, 50) + '...' : 'NULL/UNDEFINED');
         console.debug('[HR DEBUG Q2+] Extracted audioUrl:', audioUrl || 'NULL/UNDEFINED');
         console.debug('[HR DEBUG Q2+] Extracted questionNumber:', questionNumber);
-        
+
         if (!nextQuestion) {
             throw new Error('No question received from backend');
         }
-        
+
         console.log('[HR INTERVIEW] Received question:', nextQuestion.substring(0, 50) + '...');
         console.log('[HR INTERVIEW] Audio URL from response:', audioUrl);
         console.log('[HR INTERVIEW] Full response data keys:', Object.keys(data));
-        
+
         // Update current question
         currentQuestion = nextQuestion;
-        
+
         // Update local conversation history to reflect backend's source of truth
         // Note: If user_answer was sent, it's already saved in backend and included in conversation history
         // We only need to add the newly received question to local history
@@ -1152,12 +1111,12 @@ async function getNextHRQuestion(userAnswer = null) {
             audio_url: audioUrl,
             question_number: questionNumber
         });
-        
+
         console.log('[HR INTERVIEW] ✅ Updated local conversation history with new question');
-        
+
         // Display question with audio URL
         displayMessage('ai', nextQuestion, audioUrl);
-        
+
         // ✅ FIX: ALWAYS play audio for every question (match Technical Interview's simple approach)
         // For Q2-Q10, browser may block autoplay, so we need to handle this gracefully
         // ✅ FIX: Use simple setTimeout like Technical Interview (no requestAnimationFrame wrapper)
@@ -1172,32 +1131,28 @@ async function getNextHRQuestion(userAnswer = null) {
             console.debug('[HR DEBUG Q2+] isLoading.getNextQuestion:', isLoading.getNextQuestion);
             console.debug('[HR DEBUG Q2+] isLoading.playAudio:', isLoading.playAudio);
             console.debug('[HR DEBUG Q2+] ===============================================');
-            
+
             // ✅ FIX: Check if audioUrl is valid (not null, not undefined, not empty string)
             const hasValidAudioUrl = audioUrl && typeof audioUrl === 'string' && audioUrl.trim().length > 0;
-            
-                if (hasValidAudioUrl) {
-                    console.log('[HR INTERVIEW] ✅ Enqueueing next question audio:', audioUrl);
-                    console.debug('[HR DEBUG Q2+] EnqueueHRAudio() with audioUrl:', audioUrl);
-                    enqueueHRAudio(audioUrl);
-                } else {
-                    // Fallback - generate TTS from question text if audio_url is missing
-                    console.warn('[HR INTERVIEW] ⚠️ No audioUrl provided, enqueueing TTS from question text');
-                    console.debug('[HR DEBUG Q2+] audioUrl is invalid, using fallback TTS from question text');
-                    if (nextQuestion && nextQuestion.trim()) {
-                        enqueueHRAudio(nextQuestion);
-                    } else {
-                        console.error('[HR INTERVIEW] ❌ No question text available for TTS fallback');
-                        const voiceStatus = document.getElementById('voiceStatus');
-                        if (voiceStatus) {
-                            voiceStatus.textContent = 'Click the microphone to record your answer';
-                        }
-                        // Show manual play button even if we have nothing reliable
-                        if (audioUrl) {
-                            showManualPlayButton(audioUrl);
-                        }
-                    }
+
+            if (hasValidAudioUrl) {
+                console.log('[HR INTERVIEW] ✅ Playing next question audio:', audioUrl);
+                playAudio(audioUrl).catch(err => {
+                    console.warn('[HR INTERVIEW] Next question audio playback failed:', err);
+                });
+            } else if (nextQuestion && nextQuestion.trim()) {
+                // Fallback - generate TTS from question text if audio_url is missing
+                console.warn('[HR INTERVIEW] ⚠️ No audioUrl provided, using question text for TTS');
+                playAudio(nextQuestion).catch(err => {
+                    console.warn('[HR INTERVIEW] Fallback TTS generation failed:', err);
+                });
+            } else {
+                console.error('[HR INTERVIEW] ❌ No audio URL or question text available');
+                const voiceStatus = document.getElementById('voiceStatus');
+                if (voiceStatus) {
+                    voiceStatus.textContent = 'Click the microphone to record your answer';
                 }
+            }
         }, 100); // Small delay to ensure UI is updated (match Technical Interview)
 
     } catch (error) {
@@ -1205,7 +1160,7 @@ async function getNextHRQuestion(userAnswer = null) {
         const errorMsg = `Failed to get question from backend: ${error.message || 'Please try again.'}`;
         showError(errorMsg);
         document.getElementById('voiceStatus').textContent = 'Error occurred. Please try recording again or start a new interview.';
-        
+
         // No fallback to hardcoded questions - all questions must come from backend
         // If backend fails, we can only complete the interview if we have enough questions
         const questionCount = conversationHistory.filter(m => m.role === 'ai').length;
@@ -1252,10 +1207,10 @@ async function generateFeedback() {
     try {
         setLoadingState('generateFeedback', true);
         console.log('[FEEDBACK] Requesting HR feedback from backend...');
-        
+
         // Get API base URL using helper function
         const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
-        
+
         // Use HR-specific feedback endpoint
         const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/feedback`, {
             method: 'GET'
@@ -1280,22 +1235,22 @@ async function generateFeedback() {
             } catch (parseError) {
                 errorText = `HTTP ${response.status}`;
             }
-            
+
             const errorMsg = `Failed to generate feedback: ${response.status} - ${errorText}`;
             console.error('[FEEDBACK] HR feedback endpoint error:', response.status, errorText);
             console.error('[FEEDBACK] Error data:', errorData);
             showToast(errorMsg, 'error');
-            
+
             const errorObj = {
                 message: errorMsg,
                 status: response.status,
                 responseText: errorText,
                 originalError: new Error(`HTTP ${response.status}: ${errorText}`)
             };
-            
+
             // Log error but fallback to basic feedback
             showUserFriendlyError(errorObj, 'generateFeedback', true);
-            
+
             // Fallback to basic feedback if endpoint fails
             console.warn('[FEEDBACK] HR feedback endpoint failed, generating basic feedback');
             generateBasicFeedback();
@@ -1322,41 +1277,41 @@ async function generateFeedback() {
 
         // Display feedback
         document.getElementById('overallScore').textContent = Math.round(feedback.overall_score || 0);
-        
+
         // Display HR-specific scores if UI elements exist
         const communicationScoreEl = document.getElementById('communicationScore');
         if (communicationScoreEl && feedback.communication_score !== undefined) {
             communicationScoreEl.textContent = Math.round(feedback.communication_score);
         }
-        
+
         const culturalFitScoreEl = document.getElementById('culturalFitScore');
         if (culturalFitScoreEl && feedback.cultural_fit_score !== undefined) {
             culturalFitScoreEl.textContent = Math.round(feedback.cultural_fit_score);
         }
-        
+
         const motivationScoreEl = document.getElementById('motivationScore');
         if (motivationScoreEl && feedback.motivation_score !== undefined) {
             motivationScoreEl.textContent = Math.round(feedback.motivation_score);
         }
-        
+
         const clarityScoreEl = document.getElementById('clarityScore');
         if (clarityScoreEl && feedback.clarity_score !== undefined) {
             clarityScoreEl.textContent = Math.round(feedback.clarity_score);
         }
-        
+
         const strengthsList = document.getElementById('strengthsList');
         if (strengthsList) {
-        strengthsList.innerHTML = (feedback.strengths || []).map(s => `<li>${s}</li>`).join('');
+            strengthsList.innerHTML = (feedback.strengths || []).map(s => `<li>${s}</li>`).join('');
         }
 
         const improvementsList = document.getElementById('improvementsList');
         if (improvementsList) {
-        improvementsList.innerHTML = (feedback.areas_for_improvement || []).map(a => `<li>${a}</li>`).join('');
+            improvementsList.innerHTML = (feedback.areas_for_improvement || []).map(a => `<li>${a}</li>`).join('');
         }
 
         const recommendationsList = document.getElementById('recommendationsList');
         if (recommendationsList) {
-        recommendationsList.innerHTML = (feedback.recommendations || []).map(r => `<li>${r}</li>`).join('');
+            recommendationsList.innerHTML = (feedback.recommendations || []).map(r => `<li>${r}</li>`).join('');
         }
 
         const feedbackSummaryEl = document.getElementById('feedbackSummary');
@@ -1376,7 +1331,7 @@ async function generateFeedback() {
             originalError: error
         };
         showUserFriendlyError(errorObj, 'generateFeedback', true);
-        
+
         // Fallback to basic feedback on error
         generateBasicFeedback();
     } finally {
@@ -1389,7 +1344,7 @@ function generateBasicFeedback() {
     // This is only used when the backend HR feedback endpoint is unavailable.
     const userMessages = conversationHistory.filter(m => m.role === 'user');
     const answerCount = userMessages.length;
-    
+
     // ✅ FIX: Check if answers are valid (not empty, not "No Answer", and have at least 3 meaningful words)
     function isValidAnswer(answerText) {
         if (!answerText || typeof answerText !== 'string') return false;
@@ -1399,10 +1354,10 @@ function generateBasicFeedback() {
         const words = trimmed.split(/\s+/).filter(w => w.length > 2);
         return words.length >= 3;
     }
-    
+
     const validAnswers = userMessages.filter(m => isValidAnswer(m.content));
     const validAnswerCount = validAnswers.length;
-    
+
     // ✅ FIX: If NO valid answers, return 0 score with appropriate feedback
     if (validAnswerCount === 0) {
         document.getElementById('overallScore').textContent = '0';
@@ -1414,7 +1369,7 @@ function generateBasicFeedback() {
         document.getElementById('feedbackContent').classList.remove('hidden');
         return;
     }
-    
+
     // Calculate word count only for valid answers
     const totalWords = validAnswers.reduce((sum, m) => {
         if (!m.content) return sum;
@@ -1455,7 +1410,7 @@ function generateBasicFeedback() {
     document.getElementById('recommendationsList').innerHTML = recommendations.map(r => `<li>${r}</li>`).join('');
     document.getElementById('feedbackSummary').textContent =
         'We could not load the full AI report, so this quick summary is based on how many questions you answered and how detailed your responses were. For a richer, fully personalized report, please try the interview again when your connection is stable.';
-    
+
     document.getElementById('feedbackLoading').classList.add('hidden');
     document.getElementById('feedbackContent').classList.remove('hidden');
 }
@@ -1466,7 +1421,7 @@ function displayMessage(role, content, audioUrl = null) {
         console.error('[HR INTERVIEW] Conversation container not found');
         return;
     }
-    
+
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
 
@@ -1479,71 +1434,25 @@ function displayMessage(role, content, audioUrl = null) {
 
     container.appendChild(messageDiv);
     container.scrollTop = container.scrollHeight;
-    
+
 }
 
-// Helper function to stop and destroy current HR audio completely
-function stopAndDestroyCurrentHRAudio() {
-    if (currentHRAudio) {
-        console.log('[HR INTERVIEW TTS] 🛑 STOPPING AND DESTROYING current HR audio');
-        console.debug('[HR INTERVIEW TTS] Previous audio src:', currentHRAudio.src?.substring(0, 100));
-        console.debug('[HR INTERVIEW TTS] Previous audio paused:', currentHRAudio.paused);
-        console.debug('[HR INTERVIEW TTS] Previous audio ended:', currentHRAudio.ended);
-        
-        // Pause and reset
-        try {
-            currentHRAudio.pause();
-            currentHRAudio.currentTime = 0;
-        } catch (e) {
-            console.warn('[HR INTERVIEW TTS] Error pausing previous audio:', e);
-        }
-        
-        // Remove all event listeners to prevent memory leaks
-        currentHRAudio.onerror = null;
-        currentHRAudio.onended = null;
-        currentHRAudio.onloadeddata = null;
-        currentHRAudio.onloadstart = null;
-        currentHRAudio.onloadedmetadata = null;
-        currentHRAudio.oncanplaythrough = null;
-        currentHRAudio.onplay = null;
-        currentHRAudio.onpause = null;
-        currentHRAudio.onplaying = null;
-        
-        // Revoke blob URL if it exists
-        if (currentHRAudio.src && currentHRAudio.src.startsWith('blob:')) {
-            try {
-                URL.revokeObjectURL(currentHRAudio.src);
-                console.log('[HR INTERVIEW TTS] ✅ Revoked blob URL for previous audio');
-            } catch (e) {
-                console.warn('[HR INTERVIEW TTS] Error revoking blob URL:', e);
-            }
-        }
-        
-        // Clear src to fully release the audio element
-        try {
-            currentHRAudio.src = '';
-            currentHRAudio.load(); // Reset the audio element
-        } catch (e) {
-            console.warn('[HR INTERVIEW TTS] Error clearing audio src:', e);
-        }
-        
-        console.log('[HR INTERVIEW TTS] ✅ Previous HR audio destroyed');
-        currentHRAudio = null;
-        isAudioPlaying = false;
-    }
-    
-    // Also clear the old currentAudio reference for compatibility
-    if (currentAudio && currentAudio !== currentHRAudio) {
+// Helper function to stop current audio (matches Technical Interview pattern)
+function stopCurrentAudio() {
+    if (currentAudio) {
+        console.log('[HR INTERVIEW] Stopping current audio playback');
         try {
             currentAudio.pause();
             currentAudio.currentTime = 0;
+            // Clean up blob URL if it exists
             if (currentAudio.src && currentAudio.src.startsWith('blob:')) {
                 URL.revokeObjectURL(currentAudio.src);
             }
-            currentAudio = null;
         } catch (e) {
-            console.warn('[HR INTERVIEW TTS] Error clearing old currentAudio:', e);
+            console.warn('[HR INTERVIEW] Error stopping audio:', e);
         }
+        currentAudio = null;
+        isAudioPlaying = false;
     }
 }
 
@@ -1554,36 +1463,32 @@ async function playAudio(audioUrl, retryCount = 0) {
         console.debug('[HR DEBUG TTS] Early return: no audioUrl provided');
         return;
     }
-    
-    // ✅ CRITICAL FIX: ALWAYS stop and destroy any existing HR audio BEFORE starting new one
-    console.log('[HR INTERVIEW TTS] ========== STARTING NEW AUDIO PLAYBACK ==========');
-    console.log('[HR INTERVIEW TTS] Audio URL/Text:', String(audioUrl).substring(0, 80) + '...');
-    console.log('[HR INTERVIEW TTS] Current HR audio exists:', currentHRAudio !== null);
-    
-    stopAndDestroyCurrentHRAudio();
-    
-    console.log('[HR INTERVIEW TTS] ✅ Previous audio stopped and destroyed, proceeding with new audio');
-    
+
+    // Stop any currently playing audio before starting new one (matches Technical Interview)
+    console.log('[HR INTERVIEW] Starting NEW audio playback:', String(audioUrl).substring(0, 80) + '...');
+
+    stopCurrentAudio();
+
     try {
         console.log('[HR INTERVIEW TTS] Starting audio playback:', audioUrl);
         isAudioPlaying = true;
-        
+
         // Update UI to show audio is playing
         const voiceStatus = document.getElementById('voiceStatus');
         const voiceButton = document.getElementById('voiceButton');
         if (voiceStatus) voiceStatus.textContent = 'Question is being spoken...';
         if (voiceButton) voiceButton.classList.add('listening');
-        
+
         // Construct full URL if relative
         let fullUrl = audioUrl.startsWith('http') ? audioUrl : `${getApiBase()}${audioUrl}`;
-        
+
         // ✅ DEBUG: Log before TTS endpoint call
         console.debug('[HR DEBUG TTS] ========== TTS ENDPOINT CALL ==========');
         console.debug('[HR DEBUG TTS] Original audioUrl:', audioUrl);
         console.debug('[HR DEBUG TTS] Constructed fullUrl:', fullUrl);
         console.debug('[HR DEBUG TTS] fullUrl includes text=:', fullUrl.includes('text='));
         console.debug('[HR DEBUG TTS] =======================================');
-        
+
         // If URL contains text parameter, we need to fetch it via POST instead
         if (fullUrl.includes('text=')) {
             try {
@@ -1594,13 +1499,13 @@ async function playAudio(audioUrl, retryCount = 0) {
                     console.log('[HR INTERVIEW TTS] Fetching TTS audio for text:', text.substring(0, 50) + '...');
                     console.debug('[HR DEBUG TTS] About to call POST /api/interview/generate-audio');
                     console.debug('[HR DEBUG TTS] Text to convert:', text.substring(0, 100) + '...');
-                    
+
                     // Use TECH_BACKEND_URL for audio generation (supports separate backend deployment)
-                    const techBackendUrl = typeof window.getTechBackendUrl === 'function' 
-                        ? window.getTechBackendUrl() 
+                    const techBackendUrl = typeof window.getTechBackendUrl === 'function'
+                        ? window.getTechBackendUrl()
                         : (typeof getTechBackendUrl !== 'undefined' ? getTechBackendUrl() : getApiBase());
                     const audioApiUrl = `${techBackendUrl}/api/interview/generate-audio`;
-                    
+
                     // Use POST endpoint instead
                     const response = await fetch(audioApiUrl, {
                         method: 'POST',
@@ -1609,23 +1514,23 @@ async function playAudio(audioUrl, retryCount = 0) {
                         },
                         body: JSON.stringify({ text: text.trim() })
                     });
-                    
+
                     if (!response.ok) {
                         const errorText = await response.text();
                         console.error('[HR INTERVIEW TTS] TTS endpoint error:', response.status, errorText);
                         throw new Error(`TTS failed: ${response.status} - ${errorText}`);
                     }
-                    
+
                     const audioBlob = await response.blob();
                     console.debug('[HR DEBUG TTS] TTS response status:', response.status);
                     console.debug('[HR DEBUG TTS] TTS response Content-Type:', response.headers.get('Content-Type'));
                     console.debug('[HR DEBUG TTS] Audio blob size:', audioBlob.size, 'bytes');
-                    
+
                     if (audioBlob.size === 0) {
                         console.error('[HR INTERVIEW TTS] Empty audio blob received');
                         throw new Error('Empty audio blob received from TTS endpoint');
                     }
-                    
+
                     console.log('[HR INTERVIEW TTS] ✅ Audio blob received, size:', audioBlob.size, 'bytes');
                     fullUrl = URL.createObjectURL(audioBlob);
                     console.log('[HR INTERVIEW TTS] Created blob URL:', fullUrl.substring(0, 50) + '...');
@@ -1636,24 +1541,22 @@ async function playAudio(audioUrl, retryCount = 0) {
                 throw e; // Re-throw to be caught by outer catch
             }
         }
-        
+
         const audio = new Audio(fullUrl);
-        // ✅ CRITICAL: Assign to global currentHRAudio - this is the ONLY audio that should exist
-        currentHRAudio = audio;
-        currentAudio = audio; // Also update for compatibility
-        
+        currentAudio = audio;  // Track current audio instance (matches Technical Interview)
+
         console.log('[HR INTERVIEW TTS] ✅ New Audio element created and assigned to currentHRAudio');
         console.debug('[HR INTERVIEW TTS] Audio src:', audio.src?.substring(0, 100));
-        
+
         // ✅ DEBUG: Log before setting audio.src
         console.debug('[HR DEBUG TTS] ========== CREATING AUDIO ELEMENT ==========');
         console.debug('[HR DEBUG TTS] fullUrl before audio.src:', fullUrl);
         console.debug('[HR DEBUG TTS] Audio element created, about to set src');
-        
+
         // ✅ DEBUG: Log after setting audio.src (implicitly set via Audio constructor)
         console.debug('[HR DEBUG TTS] audio.src after creation:', audio.src);
         console.debug('[HR DEBUG TTS] ============================================');
-        
+
         // Set up event handlers BEFORE attempting to play
         audio.onerror = (error) => {
             console.error('[HR INTERVIEW TTS] ❌ Audio playback error:', error);
@@ -1664,11 +1567,11 @@ async function playAudio(audioUrl, retryCount = 0) {
                 src: audio.src?.substring(0, 100)
             });
             console.error('[HR INTERVIEW TTS] currentHRAudio === audio:', currentHRAudio === audio);
-            
+
             isAudioPlaying = false;
             if (voiceButton) voiceButton.classList.remove('listening');
             if (voiceStatus) voiceStatus.textContent = 'Click the microphone to record your answer';
-            
+
             if (fullUrl.startsWith('blob:')) {
                 try {
                     URL.revokeObjectURL(fullUrl);
@@ -1677,36 +1580,33 @@ async function playAudio(audioUrl, retryCount = 0) {
                     console.warn('[HR INTERVIEW TTS] Error revoking blob URL:', e);
                 }
             }
-            
+
             // ✅ CRITICAL: Clear currentHRAudio on error
-            if (currentHRAudio === audio) {
-                console.log('[HR INTERVIEW TTS] 🧹 Clearing currentHRAudio (audio error)');
-                currentHRAudio = null;
+            if (currentAudio === audio) {
+                console.log('[HR INTERVIEW TTS] 🧹 Clearing currentAudio (audio error)');
                 currentAudio = null;
             }
-            
+
             // Retry on error
             if (retryCount < MAX_RETRIES) {
                 console.log(`[HR INTERVIEW TTS] Retrying audio playback (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
                 setTimeout(() => playAudio(audioUrl, retryCount + 1), 1000 * (retryCount + 1));
             } else {
-                // Show manual play button if all retries failed
-                showManualPlayButton(audioUrl);
                 // After a terminal error on this item, advance the queue
-                setTimeout(() => playNextFromHRAudio(), 100);
+                // No queue in HR interview, so just stop
             }
         };
-        
+
         audio.onended = () => {
             console.log('[HR INTERVIEW TTS] ✅ Audio playback completed');
             console.log('[HR INTERVIEW TTS] ========== AUDIO ENDED EVENT ==========');
             console.debug('[HR INTERVIEW TTS] Audio src:', audio.src?.substring(0, 100));
-            console.debug('[HR INTERVIEW TTS] currentHRAudio === audio:', currentHRAudio === audio);
-            
+            console.debug('[HR INTERVIEW TTS] currentHRAudio === audio:', currentAudio === audio);
+
             isAudioPlaying = false;
             if (voiceButton) voiceButton.classList.remove('listening');
             if (voiceStatus) voiceStatus.textContent = 'Click the microphone to record your answer';
-            
+
             if (fullUrl.startsWith('blob:')) {
                 try {
                     URL.revokeObjectURL(fullUrl);
@@ -1715,46 +1615,44 @@ async function playAudio(audioUrl, retryCount = 0) {
                     console.warn('[HR INTERVIEW TTS] Error revoking blob URL:', e);
                 }
             }
-            
+
             // ✅ CRITICAL: Clear currentHRAudio when audio ends
-            if (currentHRAudio === audio) {
-                console.log('[HR INTERVIEW TTS] 🧹 Clearing currentHRAudio (audio ended)');
-                currentHRAudio = null;
+            if (currentAudio === audio) {
+                console.log('[HR INTERVIEW TTS] 🧹 Clearing currentAudio (audio ended)');
                 currentAudio = null;
             }
 
-            // Audio finished successfully; play next queued item if any
-            console.log('[HR INTERVIEW TTS] Checking queue for next audio...');
-            setTimeout(() => playNextFromHRAudio(), 100);
+            // Audio finished successfully; no queue to play next from
+            console.log('[HR INTERVIEW TTS] Audio finished, no queue to process.');
         };
-        
+
         audio.onloadeddata = () => {
             console.log('[HR INTERVIEW TTS] ✅ Audio data loaded, ready to play');
         };
-        
+
         audio.onloadstart = () => {
             console.log('[HR INTERVIEW TTS] Audio loading started');
         };
-        
+
         // ✅ FIX: Add additional event listeners for reliable playback verification
         audio.onloadedmetadata = () => {
             console.log('[HR INTERVIEW TTS] ✅ Audio metadata loaded');
         };
-        
+
         audio.oncanplaythrough = () => {
             console.log('[HR INTERVIEW TTS] ✅ Audio can play through');
         };
-        
+
         // ✅ FIX: Verify audio actually starts playing
         audio.onplay = () => {
             console.log('[HR INTERVIEW TTS] ✅ Audio actually started playing');
             console.log('[HR INTERVIEW TTS] ========== AUDIO PLAY EVENT ==========');
-            console.debug('[HR INTERVIEW TTS] currentHRAudio === audio:', currentHRAudio === audio);
+            console.debug('[HR INTERVIEW TTS] currentHRAudio === audio:', currentAudio === audio);
             console.debug('[HR INTERVIEW TTS] Only one audio should be playing now');
             isAudioPlaying = true;
             if (voiceStatus) voiceStatus.textContent = 'Question is being spoken...';
         };
-        
+
         // ✅ FIX: Detect unexpected pauses
         audio.onpause = () => {
             console.log('[HR INTERVIEW TTS] ⚠️ Audio was paused');
@@ -1762,16 +1660,15 @@ async function playAudio(audioUrl, retryCount = 0) {
             if (isAudioPlaying && !audio.ended && audio.currentTime > 0) {
                 console.warn('[HR INTERVIEW TTS] Audio paused unexpectedly');
                 isAudioPlaying = false;
-                showManualPlayButton(audioUrl);
             }
         };
-        
-        // ✅ FIX: Detect when audio is actually playing (not just started)
+
+        // Detect when audio is actually playing (not just started)
         audio.onplaying = () => {
-            console.log('[HR INTERVIEW TTS] ✅ Audio is now playing');
+            console.log('[HR INTERVIEW] Audio is now playing');
             isAudioPlaying = true;
         };
-        
+
         // Attempt to play audio with Promise-based verification
         try {
             console.log('[HR INTERVIEW TTS] Attempting to play audio...');
@@ -1780,50 +1677,45 @@ async function playAudio(audioUrl, retryCount = 0) {
             console.debug('[HR DEBUG TTS] audio.readyState:', audio.readyState);
             console.debug('[HR DEBUG TTS] audio.paused:', audio.paused);
             console.debug('[HR DEBUG TTS] ==========================================');
-            
+
             const playPromise = audio.play();
-            
+
             // ✅ FIX: Handle play promise with proper error catching
             if (playPromise !== undefined) {
                 await playPromise.catch(err => {
                     console.debug('[HR DEBUG TTS] audio.play() promise rejected in catch:', err);
                     console.debug('[HR DEBUG TTS] Error name:', err.name);
                     console.debug('[HR DEBUG TTS] Error message:', err.message);
-                    // ✅ FIX: Catch ALL autoplay-related errors (not just NotAllowedError)
-                    if (err.name === 'NotAllowedError' || 
+                    if (err.name === 'NotAllowedError' ||
                         err.name === 'NotSupportedError' ||
                         err.message.includes('autoplay') ||
-                        err.message.includes('user interaction') ||
-                        err.message.includes('play() request') ||
-                        err.message.includes('not allowed')) {
-                        console.warn('[HR INTERVIEW TTS] ⚠️ Autoplay blocked by browser policy:', err.message);
+                        err.message.includes('user interaction')) {
+                        console.warn('[HR INTERVIEW] Autoplay blocked by browser:', err.message);
                         isAudioPlaying = false;
                         if (voiceButton) voiceButton.classList.remove('listening');
                         if (voiceStatus) {
-                            voiceStatus.textContent = 'Click the play button below to hear the question';
+                            voiceStatus.textContent = 'Audio playback unavailable. Question is displayed above.';
                         }
-                        // Show manual play button immediately
-                        showManualPlayButton(audioUrl);
                         throw err; // Re-throw to be caught by outer catch
                     }
                     throw err; // Re-throw other errors
                 });
-                
+
                 console.log('[HR INTERVIEW TTS] ✅ Audio play() promise resolved');
                 console.debug('[HR DEBUG TTS] audio.play() promise resolved successfully');
                 console.debug('[HR DEBUG TTS] audio.paused after resolve:', audio.paused);
                 console.debug('[HR DEBUG TTS] isAudioPlaying after resolve:', isAudioPlaying);
-                
+
                 // ✅ FIX: Verify audio actually started playing after promise resolves
                 await new Promise(resolve => setTimeout(resolve, 100));
                 console.debug('[HR DEBUG TTS] After 100ms delay - audio.paused:', audio.paused);
                 console.debug('[HR DEBUG TTS] After 100ms delay - isAudioPlaying:', isAudioPlaying);
-                
+
                 if (audio.paused || !isAudioPlaying) {
                     console.warn('[HR INTERVIEW TTS] ⚠️ Audio play() succeeded but audio is paused or not playing');
                     console.debug('[HR DEBUG TTS] Audio verification failed - showing manual play button');
                     isAudioPlaying = false;
-                    showManualPlayButton(audioUrl);
+                    if (voiceStatus) voiceStatus.textContent = 'Audio playback unavailable. Question is displayed above.';
                 } else {
                     console.debug('[HR DEBUG TTS] ✅ Audio verification passed - audio is playing');
                 }
@@ -1834,143 +1726,71 @@ async function playAudio(audioUrl, retryCount = 0) {
             console.debug('[HR DEBUG TTS] playError message:', playError.message);
             console.debug('[HR DEBUG TTS] playError stack:', playError.stack);
             console.debug('[HR DEBUG TTS] =============================================');
-            // ✅ FIX: Handle autoplay policy violation with comprehensive error detection
-            if (playError.name === 'NotAllowedError' || 
+            // Handle autoplay policy violation
+            if (playError.name === 'NotAllowedError' ||
                 playError.name === 'NotSupportedError' ||
                 playError.message.includes('autoplay') ||
-                playError.message.includes('user interaction') ||
-                playError.message.includes('play() request') ||
-                playError.message.includes('not allowed')) {
-                console.warn('[HR INTERVIEW TTS] ⚠️ Autoplay blocked by browser policy:', playError.message);
+                playError.message.includes('user interaction')) {
+                console.warn('[HR INTERVIEW] Autoplay blocked by browser:', playError.message);
                 isAudioPlaying = false;
                 if (voiceButton) voiceButton.classList.remove('listening');
-                if (voiceStatus) {
-                    voiceStatus.textContent = 'Click the play button below to hear the question';
-                }
-                // Show manual play button
-                showManualPlayButton(audioUrl);
+                if (voiceStatus) voiceStatus.textContent = 'Audio playback unavailable. Question is displayed above.';
                 return; // Don't retry for autoplay errors
             } else {
-                // Re-throw other errors
                 throw playError;
             }
         }
-        
+
     } catch (error) {
-        console.error('[HR INTERVIEW TTS] ❌ Error in playAudio:', error);
+        console.error('[HR INTERVIEW] Error in playAudio:', error);
         console.error('[HR INTERVIEW TTS] ========== PLAY AUDIO CATCH BLOCK ==========');
         console.error('[HR INTERVIEW TTS] Error details:', {
             name: error.name,
             message: error.message,
             stack: error.stack
         });
-        console.error('[HR INTERVIEW TTS] currentHRAudio exists:', currentHRAudio !== null);
-        
+        console.error('[HR INTERVIEW TTS] currentHRAudio exists:', currentAudio !== null);
+
         isAudioPlaying = false;
-        
-        // ✅ CRITICAL: Clear currentHRAudio on error
-        if (currentHRAudio) {
-            console.log('[HR INTERVIEW TTS] 🧹 Clearing currentHRAudio (error in playAudio)');
-            stopAndDestroyCurrentHRAudio();
-        }
-        
+        currentAudio = null;
+
         const voiceButton = document.getElementById('voiceButton');
         const voiceStatus = document.getElementById('voiceStatus');
         if (voiceButton) voiceButton.classList.remove('listening');
         if (voiceStatus) voiceStatus.textContent = 'Click the microphone to record your answer';
-        
+
         // ✅ FIX: Check if this is an autoplay error (don't retry)
-        const isAutoplayError = error.name === 'NotAllowedError' || 
-                                error.name === 'NotSupportedError' ||
-                                error.message.includes('autoplay') ||
-                                error.message.includes('user interaction') ||
-                                error.message.includes('play() request') ||
-                                error.message.includes('not allowed');
-        
+        const isAutoplayError = error.name === 'NotAllowedError' ||
+            error.name === 'NotSupportedError' ||
+            error.message.includes('autoplay') ||
+            error.message.includes('user interaction') ||
+            error.message.includes('play() request') ||
+            error.message.includes('not allowed');
+
         if (isAutoplayError) {
-            console.warn('[HR INTERVIEW TTS] Autoplay blocked, showing manual play button');
-            showManualPlayButton(audioUrl);
+            console.warn('[HR INTERVIEW] Autoplay blocked');
+            if (voiceStatus) voiceStatus.textContent = 'Audio playback unavailable. Question is displayed above.';
             return;
         }
-        
+
         // Retry on network/loading errors (but not autoplay errors)
-        if (retryCount < MAX_RETRIES && 
-            (error.message.includes('fetch') || 
-             error.message.includes('network') || 
-             error.message.includes('Failed to load') ||
-             error.message.includes('NetworkError'))) {
-            console.log(`[HR INTERVIEW TTS] Retrying due to network error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        if (retryCount < MAX_RETRIES &&
+            (error.message.includes('fetch') ||
+                error.message.includes('network') ||
+                error.message.includes('Failed to load') ||
+                error.message.includes('NetworkError'))) {
+            console.log(`[HR INTERVIEW] Retrying audio (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
             setTimeout(() => playAudio(audioUrl, retryCount + 1), 1000 * (retryCount + 1));
         } else {
-            // ✅ FIX: Show manual play button after all retries exhausted or on non-retryable errors
-            showManualPlayButton(audioUrl);
+            console.error('[HR INTERVIEW] Audio playback failed after retries');
+            if (voiceStatus) voiceStatus.textContent = 'Audio playback unavailable. Question is displayed above.';
             // After we give up on this item, advance the queue
-            setTimeout(() => playNextFromHRAudio(), 100);
+            // No queue in HR interview, so just stop
         }
     }
     // ✅ FIX: Remove finally block - no loading state to reset (match Technical Interview)
 }
 
-// ✅ FIX: Helper function to show manual play button when autoplay fails
-// This ensures users can always play audio even if autoplay is blocked
-function showManualPlayButton(audioUrl) {
-    // ✅ DEBUG: Log when manual play button is created
-    console.debug('[HR DEBUG TTS] ========== SHOWING MANUAL PLAY BUTTON ==========');
-    console.debug('[HR DEBUG TTS] audioUrl for manual button:', audioUrl);
-    console.debug('[HR DEBUG TTS] ===============================================');
-    
-    const container = document.getElementById('conversationContainer');
-    if (!container) {
-        console.warn('[HR INTERVIEW TTS] Cannot show manual play button: container not found');
-        return;
-    }
-    
-    // ✅ FIX: Remove any existing manual play button first to avoid duplicates
-    const existingButton = document.getElementById('manualPlayButton');
-    if (existingButton) {
-        console.debug('[HR DEBUG TTS] Removing existing manual play button');
-        existingButton.remove();
-    }
-    
-    // Create manual play button
-    const playButton = document.createElement('button');
-    playButton.id = 'manualPlayButton';
-    playButton.className = 'btn btn-primary';
-    playButton.style.cssText = 'margin: 10px auto; display: block; padding: 12px 24px; font-size: 15px; font-weight: 500; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; border: none;';
-    playButton.textContent = '▶ Play Question Audio';
-    playButton.onclick = async () => {
-        console.log('[HR INTERVIEW TTS] Manual play button clicked');
-        try {
-            // Enqueue manual audio so it still respects sequential playback
-            enqueueHRAudio(audioUrl);
-            // Remove button after enqueue
-            setTimeout(() => {
-                if (playButton.parentNode) {
-                    playButton.remove();
-                }
-            }, 500);
-        } catch (err) {
-            console.error('[HR INTERVIEW TTS] Manual play enqueue failed:', err);
-            // Keep button visible if enqueue fails
-        }
-    };
-    
-    // ✅ FIX: Insert after last AI message (question) for better UX
-    const messages = container.querySelectorAll('.message.ai');
-    const lastAiMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-    
-    if (lastAiMessage) {
-        lastAiMessage.appendChild(playButton);
-    } else {
-        // Fallback: append to container
-        container.appendChild(playButton);
-    }
-    
-    // Scroll to show the button
-    container.scrollTop = container.scrollHeight;
-    
-    console.log('[HR INTERVIEW TTS] ✅ Manual play button displayed');
-}
 
 /**
  * Show user-friendly error message
@@ -1982,17 +1802,17 @@ function showManualPlayButton(audioUrl) {
 function showUserFriendlyError(error, context = 'unknown', showRetry = false) {
     // Log technical error to console for developers
     console.error(`[HR INTERVIEW ERROR] Context: ${context}`, error);
-    
+
     let userMessage = 'An unexpected error occurred. Please try again.';
     let isRecoverable = false;
-    
+
     // Extract error message
     const errorMessage = error?.message || error?.toString() || String(error);
     const errorStatus = error?.status || error?.response?.status;
-    
+
     // Map technical errors to user-friendly messages
-    if (errorMessage.includes('NetworkError') || 
-        errorMessage.includes('Failed to fetch') || 
+    if (errorMessage.includes('NetworkError') ||
+        errorMessage.includes('Failed to fetch') ||
         errorMessage.includes('network') ||
         errorMessage.includes('Network request failed')) {
         userMessage = 'Network connection error. Please check your internet connection and try again.';
@@ -2025,7 +1845,7 @@ function showUserFriendlyError(error, context = 'unknown', showRetry = false) {
         // Use error message if it's already user-friendly
         userMessage = errorMessage;
     }
-    
+
     // Display error in UI
     // If showing retry button, it will display the error message, so don't show it twice
     if (showRetry && isRecoverable) {
@@ -2035,7 +1855,7 @@ function showUserFriendlyError(error, context = 'unknown', showRetry = false) {
         // No retry button, so show the error message directly
         showError(userMessage);
     }
-    
+
     return { userMessage, isRecoverable };
 }
 
@@ -2045,7 +1865,7 @@ function showUserFriendlyError(error, context = 'unknown', showRetry = false) {
 function showRetryButton(context, errorMessage) {
     const container = document.getElementById('conversationContainer');
     if (!container) return;
-    
+
     // Check if retry button already exists
     let retryContainer = document.getElementById('retryErrorContainer');
     if (!retryContainer) {
@@ -2055,7 +1875,7 @@ function showRetryButton(context, errorMessage) {
         retryContainer.style.cssText = 'margin: 15px 0; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;';
         container.appendChild(retryContainer);
     }
-    
+
     retryContainer.innerHTML = `
         <div style="margin-bottom: 10px;">
             <strong>⚠️ ${errorMessage}</strong>
@@ -2064,14 +1884,14 @@ function showRetryButton(context, errorMessage) {
             🔄 Retry
         </button>
     `;
-    
+
     // Add retry handler
     const retryButton = document.getElementById('retryButton');
     retryButton.onclick = () => {
         retryContainer.remove();
         retryAction(context);
     };
-    
+
     container.scrollTop = container.scrollHeight;
 }
 
@@ -2111,7 +1931,7 @@ async function retryAction(context) {
  */
 function setLoadingState(operation, loading) {
     isLoading[operation] = loading;
-    
+
     // Update UI based on operation
     switch (operation) {
         case 'startInterview':
@@ -2213,14 +2033,14 @@ function showConfirmation(title, message) {
         // Remove any existing listeners by cloning and replacing buttons
         const newConfirmBtn = confirmBtn.cloneNode(true);
         confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-        
+
         const newCancelBtn = cancelBtn.cloneNode(true);
         cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-        
+
         // Get fresh references to the new buttons
         const finalConfirmBtn = document.getElementById('modalConfirmBtn');
         const finalCancelBtn = document.getElementById('modalCancelBtn');
-        
+
         // Add event listeners to the new buttons
         finalConfirmBtn.addEventListener('click', handleConfirm, { once: true });
         finalCancelBtn.addEventListener('click', handleCancel, { once: true });
@@ -2232,17 +2052,17 @@ function showConfirmation(title, message) {
 
 async function endInterview() {
     console.log('[HR INTERVIEW] endInterview called');
-    
+
     const confirmed = await showConfirmation(
         'End Interview?',
         'Are you sure you want to end your HR Interview? Your progress will be saved.'
     );
-    
+
     console.log('[HR INTERVIEW] User confirmed:', confirmed);
-    
+
     if (confirmed) {
         interviewActive = false;
-        
+
         if (isRecording) {
             stopRecording();
         }
@@ -2251,7 +2071,7 @@ async function endInterview() {
             try {
                 // Get API base URL using helper function
                 const API_BASE = typeof window.getApiBase === 'function' ? window.getApiBase() : getApiBase();
-                
+
                 // FIX: Use HR-specific endpoint instead of technical endpoint
                 const response = await fetch(`${API_BASE}/api/interview/hr/${interviewSessionId}/end`, {
                     method: 'POST'
@@ -2259,7 +2079,7 @@ async function endInterview() {
                     console.error('[HR INTERVIEW] Network error ending interview:', networkError);
                     // Don't show toast for end interview - it's not critical
                 });
-                
+
                 if (response.ok) {
                     // Log successful attempt to end session
                     console.log(`[HR INTERVIEW] End signal sent for session: ${interviewSessionId}`);
