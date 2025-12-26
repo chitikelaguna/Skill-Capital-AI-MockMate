@@ -3,7 +3,7 @@ Dashboard schemas
 Pydantic models for dashboard responses
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
 from datetime import datetime
 
@@ -14,6 +14,8 @@ class InterviewSummary(BaseModel):
     Time Complexity: O(1)
     Space Complexity: O(1)
     """
+    model_config = ConfigDict()
+    
     session_id: str
     role: str
     experience_level: str

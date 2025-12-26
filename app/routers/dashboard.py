@@ -293,7 +293,9 @@ async def get_performance_dashboard(
             skill_analysis=skill_analysis,
             resume_summary=resume_summary
         )
-        response = JSONResponse(content=response_data.dict())
+        # FIX: Use model_dump(mode='json') to properly serialize datetime objects to ISO strings
+        # This ensures all datetime fields are converted to JSON-safe ISO 8601 strings
+        response = JSONResponse(content=response_data.model_dump(mode='json'))
         # BUG FIX #2: Set cache headers to prevent Vercel/CDN caching
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
