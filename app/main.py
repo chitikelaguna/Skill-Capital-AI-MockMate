@@ -243,7 +243,7 @@ if __name__ == "__main__":
             # Use dynamic URL instead of hardcoded localhost
             base_url = get_api_base_url()
             docs_url = f"{base_url}/docs"
-            logger.info(f"🌐 Opening browser at {docs_url}")
+            logger.info(f" Opening browser at {docs_url}")
             try:
                 webbrowser.open(docs_url)
             except Exception as e:
@@ -256,10 +256,10 @@ if __name__ == "__main__":
     
     # Use dynamic URL for logging
     base_url = get_api_base_url()
-    logger.info(f"🚀 Starting Skill Capital AI MockMate Backend...")
-    logger.info(f"📡 Backend API: {base_url}")
-    logger.info(f"📚 API Docs: {base_url}/docs")
-    logger.info(f"🔗 OpenAPI Schema: {base_url}/openapi.json")
+    logger.info(f" Starting Skill Capital AI MockMate Backend...")
+    logger.info(f" Backend API: {base_url}")
+    logger.info(f" API Docs: {base_url}/docs")
+    logger.info(f" OpenAPI Schema: {base_url}/openapi.json")
     logger.info("Press CTRL+C to stop the server")
     
     # Determine host based on environment
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     else:
         server_host = "0.0.0.0"  # Accept all interfaces for production
     
-    logger.info(f"🔧 Server binding to: {server_host}:{settings.backend_port}")
+    logger.info(f"Server binding to: {server_host}:{settings.backend_port}")
     
     # For reload to work properly, use app as import string
     # When reload=True, uvicorn needs the app as an import string, not the object
